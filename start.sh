@@ -135,18 +135,21 @@ create_env_file() {
     
     if [ ! -f ".env" ]; then
         print_status "Creating .env file..."
-        cat > .env << 'EOF'
+        cat > .env << EOF
 # Django Configuration
 DEBUG=True
 SECRET_KEY=django-insecure-development-key-change-in-production
 ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 
-# AI Configuration (LM Studio)
-OLLAMA_HOST=http://192.168.0.34:1234
-BREAKDOWN_MODEL=deepseek-r1-distill-qwen-7b
-REVIEWER_MODEL=whiterabbitneo-2.5-qwen-2.5-coder-7b
-FINALIZER_MODEL=llama-3-8b-gpt-40-ru1.0
-REANALYZER_MODEL=h2o-danube2-1.8b-chat
+# AI Configuration (OpenRoute AI)
+OPENROUTE_HOST=https://openrouter.ai/api/v1
+OPENROUTE_API_KEY_DEEPSEEK=sk-or-v1-your-deepseek-api-key-here
+OPENROUTE_API_KEY_TNGTECH=sk-or-v1-your-tngtech-api-key-here
+OPENROUTE_API_KEY_OPENROUTER=sk-or-v1-your-openrouter-api-key-here
+BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
+FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REANALYZER_MODEL=openrouter/horizon-beta
 
 # Database Configuration
 DATABASE_URL=sqlite:///db.sqlite3
@@ -161,7 +164,7 @@ EOF
     fi
 }
 
-# Function to create directories if needed
+# Function to create project directories
 create_directories() {
     print_status "Creating project directories..."
     
@@ -172,7 +175,6 @@ create_directories() {
     mkdir -p java_assets
     mkdir -p prompts
     mkdir -p backups
-    mkdir -p Studio
     
     print_success "Project directories created"
 }
@@ -217,7 +219,7 @@ setup_environment() {
         export DEBUG=True
         export SECRET_KEY=django-insecure-development-key
         export ALLOWED_HOSTS=localhost,127.0.0.1
-        export OLLAMA_HOST=http://192.168.0.34:1234
+        export OPENROUTE_HOST=https://openrouter.ai/api/v1
     fi
 }
 
@@ -308,70 +310,6 @@ make_scripts_executable() {
     print_success "Scripts made executable"
 }
 
-# Function to start LM Studio if available
-start_lm_studio() {
-    print_status "Checking LM Studio..."
-    
-    # Check LM Studio API
-    print_status "Checking LM Studio API..."
-    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-        print_success "LM Studio API is responding"
-    else
-        print_warning "LM Studio API not responding"
-        print_status "Please ensure LM Studio is running with local server enabled"
-    fi
-    
-    # Check if LM Studio process is running (multiple possible names)
-    if pgrep -f "lm-studio" > /dev/null || pgrep -f "LM-Studio" > /dev/null || pgrep -f "lmstudio" > /dev/null; then
-        print_warning "LM Studio process found but API not responding"
-        print_status "Waiting for LM Studio to start up..."
-        
-        # Wait up to 30 seconds for LM Studio to start
-        for i in {1..30}; do
-            if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-                print_success "LM Studio API is now responding"
-                return 0
-            fi
-            sleep 1
-        done
-        
-        print_warning "LM Studio process found but API still not responding after 30 seconds"
-    fi
-    
-    # LM Studio is not running, try to start it
-    print_status "Starting LM Studio..."
-    
-    # Check if AppImage exists
-    if [ -f "Studio/LM-Studio-0.3.20-4-x64.AppImage" ]; then
-        chmod +x Studio/LM-Studio-0.3.20-4-x64.AppImage
-        print_status "Starting LM Studio AppImage..."
-        nohup Studio/LM-Studio-0.3.20-4-x64.AppImage > /dev/null 2>&1 &
-        LM_STUDIO_PID=$!
-        
-        # Wait for LM Studio to start
-        print_status "Waiting for LM Studio to start up..."
-        for i in {1..60}; do
-            if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-                print_success "LM Studio started successfully (PID: $LM_STUDIO_PID)"
-                return 0
-            fi
-            sleep 1
-        done
-        
-        print_warning "LM Studio started but API not responding after 60 seconds"
-    else
-        print_warning "LM Studio AppImage not found at Studio/LM-Studio-0.3.20-4-x64.AppImage"
-        print_status "Please ensure LM Studio is installed and running manually"
-    fi
-    
-    # Final check
-    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-        print_success "LM Studio API is responding"
-    else
-        print_warning "LM Studio API not responding - you may need to start it manually"
-    fi
-}
-
 # Function to run health checks
 run_health_checks() {
     print_status "Running health checks..."
@@ -419,7 +357,7 @@ show_startup_info() {
     echo ""
     echo "Available Services:"
     echo "- Django Web Server: http://localhost:8000"
-    echo "- LM Studio API: http://192.168.0.34:1234"
+    echo "- OpenRoute AI API: https://openrouter.ai/api/v1"
     echo ""
     echo "Project URLs:"
     echo "- Home: http://localhost:8000/"
@@ -505,12 +443,6 @@ main() {
     
     # Run health checks
     run_health_checks
-    
-    # Start LM Studio if available
-    start_lm_studio
-    
-    # Show startup information
-    show_startup_info
     
     # Start Django server (this will be the main process)
     start_django_server

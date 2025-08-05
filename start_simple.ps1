@@ -52,7 +52,7 @@ LOG_FILE=logs/app.log
 }
 
 # Create directories
-$directories = @("logs", "media\documents", "staticfiles", "assets", "java_assets", "prompts", "backups", "Studio")
+$directories = @("logs", "media\documents", "staticfiles", "assets", "java_assets", "prompts", "backups")
 foreach ($dir in $directories) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null

@@ -117,12 +117,15 @@ if not exist ".env" (
         echo SECRET_KEY=django-insecure-development-key-change-in-production
         echo ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
         echo.
-        echo # AI Configuration ^(LM Studio^)
-        echo OLLAMA_HOST=http://192.168.0.34:1234
-        echo BREAKDOWN_MODEL=deepseek-r1-distill-qwen-7b
-        echo REVIEWER_MODEL=whiterabbitneo-2.5-qwen-2.5-coder-7b
-        echo FINALIZER_MODEL=llama-3-8b-gpt-40-ru1.0
-        echo REANALYZER_MODEL=h2o-danube2-1.8b-chat
+        echo # AI Configuration ^(OpenRoute AI^)
+        echo OPENROUTE_HOST=https://openrouter.ai/api/v1
+        echo OPENROUTE_API_KEY_DEEPSEEK=sk-or-v1-your-deepseek-api-key-here
+        echo OPENROUTE_API_KEY_TNGTECH=sk-or-v1-your-tngtech-api-key-here
+        echo OPENROUTE_API_KEY_OPENROUTER=sk-or-v1-your-openrouter-api-key-here
+        echo BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+        echo REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
+        echo FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+        echo REANALYZER_MODEL=openrouter/horizon-beta
         echo.
         echo # Database Configuration
         echo DATABASE_URL=sqlite:///db.sqlite3
@@ -147,7 +150,6 @@ if not exist "assets" mkdir assets
 if not exist "java_assets" mkdir java_assets
 if not exist "prompts" mkdir prompts
 if not exist "backups" mkdir backups
-if not exist "Studio" mkdir Studio
 call :print_success "Project directories created"
 goto :eof
 
@@ -189,7 +191,7 @@ if exist ".env" (
     set "DEBUG=True"
     set "SECRET_KEY=django-insecure-development-key"
     set "ALLOWED_HOSTS=localhost,127.0.0.1"
-    set "OLLAMA_HOST=http://192.168.0.34:1234"
+    set "OPENROUTE_HOST=https://openrouter.ai/api/v1"
 )
 goto :eof
 
@@ -260,72 +262,6 @@ if errorlevel 1 (
 )
 goto :eof
 
-REM Function to start LM Studio if available
-:start_lm_studio
-call :print_status "Checking LM Studio..."
-
-REM Check LM Studio API
-call :print_status "Checking LM Studio API..."
-curl -s http://192.168.0.34:1234/v1/models >nul 2>&1
-if errorlevel 1 (
-    call :print_warning "LM Studio API not responding"
-    call :print_status "Please ensure LM Studio is running with local server enabled"
-) else (
-    call :print_success "LM Studio API is responding"
-)
-
-REM Check if LM Studio process is running
-tasklist /FI "IMAGENAME eq LM-Studio-0.3.20-4-x64.exe" 2>NUL | find /I /N "LM-Studio-0.3.20-4-x64.exe">NUL
-if errorlevel 1 (
-    REM LM Studio is not running, try to start it
-    call :print_status "Starting LM Studio..."
-    
-    REM Check if exe exists
-    if exist "Studio\LM-Studio-0.3.20-4-x64.exe" (
-        call :print_status "Starting LM Studio executable..."
-        start "" "Studio\LM-Studio-0.3.20-4-x64.exe"
-        
-        REM Wait for LM Studio to start
-        call :print_status "Waiting for LM Studio to start up..."
-        for /l %%i in (1,1,60) do (
-            timeout /t 1 /nobreak >nul
-            curl -s http://192.168.0.34:1234/v1/models >nul 2>&1
-            if not errorlevel 1 (
-                call :print_success "LM Studio started successfully"
-                goto :lm_studio_started
-            )
-        )
-        call :print_warning "LM Studio started but API not responding after 60 seconds"
-    ) else (
-        call :print_warning "LM Studio executable not found at Studio\LM-Studio-0.3.20-4-x64.exe"
-        call :print_status "Please ensure LM Studio is installed and running manually"
-    )
-) else (
-    call :print_warning "LM Studio process found but API not responding"
-    call :print_status "Waiting for LM Studio to start up..."
-    
-    REM Wait up to 30 seconds for LM Studio to start
-    for /l %%i in (1,1,30) do (
-        timeout /t 1 /nobreak >nul
-        curl -s http://192.168.0.34:1234/v1/models >nul 2>&1
-        if not errorlevel 1 (
-            call :print_success "LM Studio API is now responding"
-            goto :lm_studio_started
-        )
-    )
-    call :print_warning "LM Studio process found but API still not responding after 30 seconds"
-)
-
-:lm_studio_started
-REM Final check
-curl -s http://192.168.0.34:1234/v1/models >nul 2>&1
-if errorlevel 1 (
-    call :print_warning "LM Studio API not responding - you may need to start it manually"
-) else (
-    call :print_success "LM Studio API is responding"
-)
-goto :eof
-
 REM Function to run health checks
 :run_health_checks
 call :print_status "Running health checks..."
@@ -372,7 +308,7 @@ echo =============================================
 echo.
 echo Available Services:
 echo - Django Web Server: http://localhost:8000
-echo - LM Studio API: http://192.168.0.34:1234
+echo - OpenRoute AI API: https://openrouter.ai/api/v1
 echo.
 echo Project URLs:
 echo - Home: http://localhost:8000/
@@ -452,9 +388,6 @@ call :create_superuser
 
 REM Run health checks
 call :run_health_checks
-
-REM Start LM Studio if available
-call :start_lm_studio
 
 REM Show startup information
 call :show_startup_info

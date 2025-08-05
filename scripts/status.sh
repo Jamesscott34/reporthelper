@@ -15,20 +15,31 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🔍 AI Report Writer Status Dashboard${NC}"
 echo -e "${BLUE}===================================${NC}"
 
-# Function to check LM Studio status
-check_lm_studio_status() {
-    echo -e "${BLUE}🤖 LM Studio Status:${NC}"
+# Function to check OpenRoute AI status
+check_openroute_status() {
+    echo -e "${BLUE}🤖 OpenRoute AI Status:${NC}"
     
-    # Check if LM Studio process is running
-    if pgrep -f "LM-Studio" > /dev/null; then
-        echo -e "  ${GREEN}✅ Process: Running${NC}"
+    # Check if .env file exists and has API keys
+    if [ -f ".env" ]; then
+        if grep -q "OPENROUTE_API_KEY" .env; then
+            echo -e "  ${GREEN}✅ Configuration: Found${NC}"
+            
+            # Check if API keys are configured
+            if grep -q "sk-or-v1-" .env; then
+                echo -e "  ${GREEN}✅ API Keys: Configured${NC}"
+            else
+                echo -e "  ${YELLOW}⚠️  API Keys: Not configured${NC}"
+            fi
+        else
+            echo -e "  ${RED}❌ Configuration: Not found${NC}"
+        fi
     else
-        echo -e "  ${RED}❌ Process: Not running${NC}"
+        echo -e "  ${RED}❌ .env file: Not found${NC}"
     fi
     
     # Check API endpoint
-    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-        echo -e "  ${GREEN}✅ API: Responding at http://192.168.0.34:1234${NC}"
+    if curl -s https://openrouter.ai/api/v1/models > /dev/null 2>&1; then
+        echo -e "  ${GREEN}✅ API: Responding at https://openrouter.ai/api/v1${NC}"
     else
         echo -e "  ${RED}❌ API: Not responding${NC}"
     fi
@@ -99,7 +110,7 @@ check_permissions() {
     echo -e "${BLUE}🔐 File Permissions:${NC}"
     
     # Check if scripts are executable
-    if [ -x "scripts/start_django.sh" ] && [ -x "scripts/start_llmstudio.sh" ]; then
+    if [ -x "scripts/start_django.sh" ]; then
         echo -e "  ${GREEN}✅ Scripts: Executable${NC}"
     else
         echo -e "  ${YELLOW}⚠️  Scripts: Some not executable${NC}"
@@ -122,11 +133,7 @@ display_summary() {
     
     # Count running services
     RUNNING_SERVICES=0
-    TOTAL_SERVICES=2
-    
-    if pgrep -f "LM-Studio" > /dev/null; then
-        ((RUNNING_SERVICES++))
-    fi
+    TOTAL_SERVICES=1
     
     if pgrep -f "manage.py runserver" > /dev/null; then
         ((RUNNING_SERVICES++))
@@ -145,7 +152,6 @@ display_summary() {
     echo ""
     echo -e "${BLUE}Quick Actions:${NC}"
     echo "• Start all services: ./setup.sh"
-    echo "• Test LM Studio: ./scripts/test_lmstudio.sh"
     echo "• Check detailed status: ./scripts/check_status.sh"
     echo -e "${NC}"
 }
@@ -156,7 +162,7 @@ main() {
     echo ""
     check_database_status
     echo ""
-    check_lm_studio_status
+    check_openroute_status
     echo ""
     check_django_status
     echo ""

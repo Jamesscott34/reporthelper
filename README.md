@@ -1,6 +1,6 @@
 # 🤖 AI Report Writer
 
-A comprehensive Django-based AI document assistant platform that transforms documents into structured, step-by-step reports using local AI models via LM Studio.
+A comprehensive Django-based AI document assistant platform that transforms documents into structured, step-by-step reports using OpenRoute AI models.
 
 ## 🎯 Overview
 
@@ -18,26 +18,30 @@ AI Report Writer is a modular platform that:
 
 ### AI Agents Pipeline
 
-1. **🧠 AI 1 – Breakdown AI** (`deepseek-r1-distill-qwen-7b`)
+1. **🧠 AI 1 – Breakdown AI** (`deepseek/deepseek-r1-0528-qwen3-8b:free`)
    - Converts raw document text into step-by-step bullet point instructions
    - Uses structured prompts for consistent output
+   - **API Key**: DeepSeek (sk-or-v1-...)
 
-2. **👓 AI 2 – Reviewer AI** (`whiterabbitneo-2.5-qwen-2.5-coder-7b`)
+2. **👓 AI 2 – Reviewer AI** (`tngtech/deepseek-r1t2-chimera:free`)
    - Provides multiple reviewer perspectives (academic, technical, casual)
    - Gives feedback and suggestions on breakdowns
+   - **API Key**: TNGTech (sk-or-v1-...)
 
-3. **🧹 AI 3 – Finalizer AI** (`llama-3-8b-gpt-40-ru1.0`)
+3. **🧹 AI 3 – Finalizer AI** (`deepseek/deepseek-r1-0528-qwen3-8b:free`)
    - Rewrites breakdowns into human-sounding, professional reports
    - Ensures natural language flow and readability
+   - **API Key**: DeepSeek (sk-or-v1-...)
 
-4. **🧪 AI 4 – Re-analyzer AI** (`h2o-danube2-1.8b-chat`) *(Optional)*
+4. **🧪 AI 4 – Re-analyzer AI** (`openrouter/horizon-beta`) *(Optional)*
    - Analyzes and optimizes existing breakdowns
    - Suggests improvements and simplifications
+   - **API Key**: OpenRouter (sk-or-v1-...)
 
 ### Tech Stack
 
 - **Backend**: Django 4.2.23 (Python)
-- **AI**: LM Studio (local AI models)
+- **AI**: OpenRoute AI (cloud-based AI models)
 - **Frontend**: HTML, CSS, JavaScript (Bootstrap 5)
 - **Database**: SQLite (default), PostgreSQL (optional)
 - **File Processing**: python-docx, PyPDF2
@@ -48,7 +52,7 @@ AI Report Writer is a modular platform that:
 ### Prerequisites
 
 - Python 3.8+
-- LM Studio (with compatible models)
+- OpenRoute AI API keys
 - Git
 
 ### Installation
@@ -59,7 +63,9 @@ AI Report Writer is a modular platform that:
    cd Report_AI
    ```
 
-2. **Run the enhanced setup script**
+2. **Create `.env` file** (see Configuration section below)
+
+3. **Run the enhanced setup script**
    ```bash
    # Make setup script executable
    chmod +x setup.sh
@@ -68,27 +74,22 @@ AI Report Writer is a modular platform that:
    ./setup.sh
    ```
 
-3. **Automatic Startup Features**
+4. **Automatic Startup Features**
    The setup script now automatically:
-   - ✅ Starts LM Studio (if not already running)
    - ✅ Starts Django server
    - ✅ Applies any updates
    - ✅ Runs health checks
    - ✅ Displays status dashboard
 
-4. **Access the application**
+5. **Access the application**
    - Open: http://127.0.0.1:8000
    - Admin: http://127.0.0.1:8000/admin (admin/admin123)
-   - LM Studio API: http://192.168.0.34:1234
 
 ### Manual Startup (if needed)
 
 If you need to start services manually:
 
 ```bash
-# Start LM Studio
-./scripts/start_llmstudio.sh
-
 # Start Django (in another terminal)
 ./scripts/start_django.sh
 
@@ -155,15 +156,12 @@ ai_report_writer/
 │   └── breakdown/           # Breakdown app templates
 ├── static/                   # CSS, JS, images
 ├── scripts/                  # Startup and utility scripts
-│   ├── start_llmstudio.sh   # LM Studio startup
 │   ├── start_django.sh      # Django startup
 │   ├── check_status.sh      # System health check
 │   ├── status.sh            # Quick status dashboard
 │   ├── backup.sh            # Backup system
 │   ├── update.sh            # Automatic updates
-│   ├── test_lmstudio.sh     # LM Studio connection test
 │   └── generate_secret_key.py # Secure key generator
-├── Studio/                   # LM Studio AppImage
 ├── assets/                   # Local AI assets
 ├── java_assets/             # Java files for DOCX/PDF generation
 ├── backups/                 # Automatic backups
@@ -174,40 +172,83 @@ ai_report_writer/
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Environment Variables (.env)
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root with the following exact layout:
 
 ```env
-# Django Settings
-SECRET_KEY=your-secret-key-here
+# Django Configuration
 DEBUG=True
-ALLOWED_HOSTS=127.0.0.1,localhost
+SECRET_KEY=django-insecure-development-key-change-in-production
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 
-# AI Configuration (LM Studio)
-OLLAMA_HOST=http://192.168.0.34:1234
-BREAKDOWN_MODEL=deepseek-r1-distill-qwen-7b
-REVIEWER_MODEL=whiterabbitneo-2.5-qwen-2.5-coder-7b
-FINALIZER_MODEL=llama-3-8b-gpt-40-ru1.0
-REANALYZER_MODEL=h2o-danube2-1.8b-chat
+# AI Configuration (OpenRoute AI)
+OPENROUTE_HOST=https://openrouter.ai/api/v1
+OPENROUTE_API_KEY_DEEPSEEK=apikey
+OPENROUTE_API_KEY_TNGTECH=apikey
+OPENROUTE_API_KEY_OPENROUTER=apikey
+BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
+FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REANALYZER_MODEL=openrouter/horizon-beta
 
-# Optional: Celery Configuration
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
+# Database Configuration
+DATABASE_URL=sqlite:///db.sqlite3
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=logs/app.log
 ```
 
-### LM Studio Setup
+### API Key Setup
 
-1. **Load Models**: Open LM Studio and load your models:
-   - `deepseek-r1-distill-qwen-7b`
-   - `whiterabbitneo-2.5-qwen-2.5-coder-7b`
-   - `llama-3-8b-gpt-40-ru1.0`
-   - `h2o-danube2-1.8b-chat`
+1. **Get OpenRoute AI API Keys**:
+   - Visit [OpenRoute AI](https://openrouter.ai/)
+   - Sign up for an account
+   - Navigate to API Keys section
+   - Create API keys for each model provider:
+     - **DeepSeek**: For `deepseek/deepseek-r1-0528-qwen3-8b:free`
+     - **TNGTech**: For `tngtech/deepseek-r1t2-chimera:free`
+     - **OpenRouter**: For `openrouter/horizon-beta`
 
-2. **Start Local Server**: In LM Studio:
-   - Go to "Local Server" tab
-   - Click "Start Server"
-   - Ensure it's running on `http://192.168.0.34:1234`
+2. **Add API Keys to .env**:
+   - Replace `sk-or-v1-your-deepseek-api-key-here` with your actual DeepSeek API key
+   - Replace `sk-or-v1-your-tngtech-api-key-here` with your actual TNGTech API key
+   - Replace `sk-or-v1-your-openrouter-api-key-here` with your actual OpenRouter API key
+
+3. **Model Configuration**:
+   - Each model is automatically assigned to the correct API key based on the model name
+   - DeepSeek models use the `OPENROUTE_API_KEY_DEEPSEEK`
+   - TNGTech models use the `OPENROUTE_API_KEY_TNGTECH`
+   - OpenRouter models use the `OPENROUTE_API_KEY_OPENROUTER`
+
+### Example .env File
+
+Here's a complete example with the current AI models and API keys:
+
+```env
+# Django Configuration
+DEBUG=True
+SECRET_KEY=django-insecure-development-key-change-in-production
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+
+# AI Configuration (OpenRoute AI)
+OPENROUTE_HOST=https://openrouter.ai/api/v1
+OPENROUTE_API_KEY_DEEPSEEK=apikey
+OPENROUTE_API_KEY_TNGTECH=apikey
+OPENROUTE_API_KEY_OPENROUTER=apikey
+BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
+FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REANALYZER_MODEL=openrouter/horizon-beta
+
+# Database Configuration
+DATABASE_URL=sqlite:///db.sqlite3
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=logs/app.log
+```
 
 ## 📖 Usage
 
@@ -279,7 +320,7 @@ python manage.py test
 
 ### Adding New AI Models
 
-1. **Update Settings**: Add model to `OLLAMA_MODELS` in `settings.py`
+1. **Update Settings**: Add model to `OPENROUTE_MODELS` in `settings.py`
 2. **Create Service**: Add new AI service class
 3. **Update Views**: Integrate new AI functionality
 4. **Test**: Verify with sample documents
@@ -303,7 +344,7 @@ Edit prompt templates in:
 # - Virtual environment status
 # - Django installation
 # - Database connection
-# - LM Studio status
+# - OpenRoute AI status
 # - File permissions
 # - Dependencies
 ```
@@ -333,15 +374,15 @@ tar -xzf backups/ai_report_writer_backup_YYYYMMDD_HHMMSS.tar.gz
 
 ### Common Issues
 
-1. **LM Studio Not Responding**
-   - Ensure LM Studio is running
-   - Check if local server is started
-   - Verify API endpoint: http://192.168.0.34:1234
+1. **OpenRoute AI Not Responding**
+   - Ensure API keys are correctly set in `.env`
+   - Check if API keys are valid and have sufficient credits
+   - Verify API endpoint: https://openrouter.ai/api/v1
 
 2. **Model Not Found**
-   - Load models in LM Studio
-   - Check model names in settings
-   - Verify model compatibility
+   - Check model names in `.env` file
+   - Verify model availability on OpenRoute AI
+   - Ensure correct API key is assigned to model
 
 3. **File Upload Issues**
    - Check file size (max 50MB)
@@ -410,7 +451,7 @@ DEBUG=True
 - **Python**: 3.8 or higher
 - **Memory**: 4GB RAM minimum (8GB recommended)
 - **Storage**: 2GB free space
-- **Network**: Internet for initial setup
+- **Network**: Internet for OpenRoute AI API access
 
 ## 📄 License
 
@@ -435,6 +476,6 @@ For support and questions:
 
 ---
 
-**Made with ❤️ using Django and LM Studio**
+**Made with ❤️ using Django and OpenRoute AI**
 
 *Last updated: Version 1.0.0 - Automatic update system included*

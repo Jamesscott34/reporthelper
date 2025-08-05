@@ -98,12 +98,15 @@ DEBUG=True
 SECRET_KEY=django-insecure-development-key-change-in-production
 ALLOWED_HOSTS=localhost,127.0.0.1
 
-# AI Configuration (LM Studio)
-OLLAMA_HOST=http://192.168.0.34:1234
-BREAKDOWN_MODEL=deepseek-r1-distill-qwen-7b
-REVIEWER_MODEL=whiterabbitneo-2.5-qwen-2.5-coder-7b
-FINALIZER_MODEL=llama-3-8b-gpt-40-ru1.0
-REANALYZER_MODEL=h2o-danube2-1.8b-chat
+# AI Configuration (OpenRoute AI)
+OPENROUTE_HOST=https://openrouter.ai/api/v1
+OPENROUTE_API_KEY_DEEPSEEK=sk-or-v1-your-deepseek-api-key-here
+OPENROUTE_API_KEY_TNGTECH=sk-or-v1-your-tngtech-api-key-here
+OPENROUTE_API_KEY_OPENROUTER=sk-or-v1-your-openrouter-api-key-here
+BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
+FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
+REANALYZER_MODEL=openrouter/horizon-beta
 
 # Database Configuration
 DATABASE_URL=sqlite:///db.sqlite3
@@ -202,7 +205,7 @@ setup_environment() {
         export DEBUG=True
         export SECRET_KEY=django-insecure-development-key
         export ALLOWED_HOSTS=localhost,127.0.0.1
-        export OLLAMA_HOST=http://192.168.0.34:1234
+        export OPENROUTE_HOST=https://openrouter.ai/api/v1
     fi
     
     print_success "Environment variables set"
@@ -282,35 +285,6 @@ create_superuser() {
     fi
 }
 
-# Function to start LM Studio if available
-start_lm_studio() {
-    print_status "Checking LM Studio..."
-    
-    # Check if LM Studio is running
-    if pgrep -f "LM-Studio" > /dev/null; then
-        print_success "LM Studio is already running"
-    else
-        print_status "Starting LM Studio..."
-        
-        # Check if AppImage exists
-        if [ -f "Studio/LM-Studio-0.3.20-4-x64.AppImage" ]; then
-            chmod +x Studio/LM-Studio-0.3.20-4-x64.AppImage
-            nohup Studio/LM-Studio-0.3.20-4-x64.AppImage > /dev/null 2>&1 &
-            sleep 10
-            print_success "LM Studio started"
-        else
-            print_warning "LM Studio AppImage not found"
-        fi
-    fi
-    
-    # Check API endpoint
-    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
-        print_success "LM Studio API responding"
-    else
-        print_warning "LM Studio API not responding"
-    fi
-}
-
 # Function to start Django development server
 start_django_server() {
     print_status "Starting Django development server..."
@@ -330,7 +304,7 @@ show_startup_info() {
     echo ""
     echo "Available Services:"
     echo "- Django Web Server: http://localhost:8000"
-    echo "- LM Studio API: http://192.168.0.34:1234"
+    echo "- OpenRoute AI API: https://openrouter.ai/api/v1"
     echo ""
     echo "Project URLs:"
     echo "- Home: http://localhost:8000/"
@@ -410,9 +384,6 @@ main() {
     
     # Create superuser if needed
     create_superuser
-    
-    # Start LM Studio if available
-    start_lm_studio
     
     # Show startup information
     show_startup_info
