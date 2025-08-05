@@ -2,6 +2,8 @@
 
 This guide will help you set up and run the AI Report Writer project on Windows.
 
+
+
 ## Prerequisites
 
 1. **Python 3.8+** - Download and install from [python.org](https://www.python.org/downloads/)
@@ -20,8 +22,9 @@ This guide will help you set up and run the AI Report Writer project on Windows.
 # Allow script execution (if needed)
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
+
 # Run the startup script
-.\start.ps1
+powershell -ExecutionPolicy Bypass -File start_simple.ps1  
 ```
 
 ### Option 2: Using Command Prompt
