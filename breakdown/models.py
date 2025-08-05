@@ -30,9 +30,46 @@ class Document(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     ], default='uploaded')
+    
+    # New fields for tracking relationships
+    parent_document = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='generated_files')
+    document_type = models.CharField(max_length=20, choices=[
+        ('original', 'Original Upload'),
+        ('breakdown', 'AI Breakdown'),
+        ('report', 'Generated Report'),
+        ('comparison', 'Comparison Analysis'),
+        ('export', 'Exported File'),
+    ], default='original')
+    
+    # Additional metadata for generated files
+    generation_method = models.CharField(max_length=50, blank=True)  # e.g., 'AI Breakdown', 'Comparison Analysis'
+    ai_model_used = models.CharField(max_length=100, blank=True)  # AI model used for generation
 
     def __str__(self):
-        return f"{self.title} ({self.file_type})"
+        if self.document_type == 'original':
+            return f"{self.title} ({self.file_type}) - Original"
+        else:
+            return f"{self.title} ({self.file_type}) - {self.document_type.title()}"
+    
+    def is_original(self):
+        """Check if this is an original uploaded document."""
+        return self.document_type == 'original' and self.parent_document is None
+    
+    def is_generated(self):
+        """Check if this is a generated file."""
+        return self.document_type != 'original'
+    
+    def get_original_document(self):
+        """Get the original document that this file was generated from."""
+        if self.is_original():
+            return self
+        elif self.parent_document:
+            return self.parent_document.get_original_document()
+        return None
+    
+    def get_generated_files(self):
+        """Get all files generated from this document."""
+        return self.generated_files.all()
 
     class Meta:
         ordering = ['-uploaded_at']

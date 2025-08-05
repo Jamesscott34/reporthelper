@@ -24,9 +24,16 @@ def home(request):
     """
     Home view - displays the main upload interface.
     """
-    documents = Document.objects.all().order_by('-uploaded_at')[:10]
+    # Get original documents and their generated files
+    original_documents = Document.objects.filter(document_type='original').order_by('-uploaded_at')[:10]
+    generated_documents = Document.objects.filter(document_type__in=['breakdown', 'report', 'comparison', 'export']).order_by('-uploaded_at')[:5]
+    
+    # Combine and sort by upload date
+    all_documents = list(original_documents) + list(generated_documents)
+    all_documents.sort(key=lambda x: x.uploaded_at, reverse=True)
+    
     return render(request, 'breakdown/home.html', {
-        'documents': documents
+        'documents': all_documents[:15]  # Show up to 15 most recent documents
     })
 
 
@@ -294,18 +301,38 @@ def document_list(request):
 
 def delete_document(request, document_id):
     """
-    Delete a document and its associated breakdowns.
+    Delete a document and its associated files.
     """
     document = get_object_or_404(Document, id=document_id)
     
     if request.method == 'POST':
-        # Delete the file from storage
-        if document.file:
-            default_storage.delete(document.file.name)
+        try:
+            # If this is an original document, delete all generated files first
+            if document.is_original():
+                generated_files = document.get_generated_files()
+                for generated_file in generated_files:
+                    # Delete the generated file from storage
+                    if generated_file.file:
+                        default_storage.delete(generated_file.file.name)
+                    generated_file.delete()
+                messages.success(request, f'Document "{document.title}" and {generated_files.count()} generated files deleted successfully.')
+            else:
+                # This is a generated file, just delete it
+                if document.file:
+                    default_storage.delete(document.file.name)
+                messages.success(request, f'Generated file "{document.title}" deleted successfully.')
+            
+            # Delete the original document file from storage
+            if document.file:
+                default_storage.delete(document.file.name)
+            
+            document.delete()
+            
+        except Exception as e:
+            messages.error(request, f'Error deleting document: {str(e)}')
+            return redirect('breakdown:document_list')
         
-        document.delete()
-        messages.success(request, 'Document deleted successfully.')
-        return redirect('breakdown:document_list')
+        return redirect('breakdown:home')
     
     return render(request, 'breakdown/delete_confirm.html', {
         'document': document

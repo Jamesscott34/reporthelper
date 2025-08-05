@@ -44,17 +44,20 @@
         <!-- Recent Documents -->
         {% if documents %}
         <div class="card shadow-sm mt-4">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-clock"></i> Recent Documents
                 </h5>
+                <a href="{% url 'breakdown:document_list' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-list"></i> View All
+                </a>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Title</th>
+                                <th>Document</th>
                                 <th>Type</th>
                                 <th>Status</th>
                                 <th>Uploaded</th>
@@ -63,12 +66,45 @@
                         </thead>
                         <tbody>
                             {% for document in documents %}
-                            <tr>
+                            <tr class="{% if document.is_original %}table-primary{% elif document.is_generated %}table-light{% endif %}">
                                 <td>
-                                    <strong>{{ document.title }}</strong>
+                                    <div class="d-flex align-items-center">
+                                        {% if document.is_original %}
+                                            <i class="fas fa-file-upload text-primary me-2"></i>
+                                        {% elif document.is_generated %}
+                                            <i class="fas fa-file-alt text-secondary me-2"></i>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ document.title }}</strong>
+                                            {% if document.is_generated and document.parent_document %}
+                                                <br>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-arrow-up"></i> Generated from: 
+                                                    <a href="{% url 'breakdown:breakdown_detail' breakdown_id=document.parent_document.breakdowns.first.id %}">
+                                                        {{ document.parent_document.title }}
+                                                    </a>
+                                                </small>
+                                            {% endif %}
+                                            {% if document.is_original and document.generated_files.exists %}
+                                                <br>
+                                                <small class="text-success">
+                                                    <i class="fas fa-arrow-down"></i> 
+                                                    {{ document.generated_files.count }} generated file{{ document.generated_files.count|pluralize }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
-                                    <span class="badge bg-secondary">{{ document.file_type|upper }}</span>
+                                    <span class="badge bg-{% if document.is_original %}primary{% else %}secondary{% endif %}">
+                                        {% if document.is_original %}
+                                            <i class="fas fa-upload"></i> Original
+                                        {% else %}
+                                            <i class="fas fa-magic"></i> {{ document.document_type|title }}
+                                        {% endif %}
+                                    </span>
+                                    <br>
+                                    <small class="text-muted">{{ document.file_type|upper }}</small>
                                 </td>
                                 <td>
                                     {% if document.status == 'completed' %}
@@ -83,12 +119,27 @@
                                 </td>
                                 <td>{{ document.uploaded_at|date:"M d, Y" }}</td>
                                 <td>
-                                    {% if document.status == 'completed' %}
-                                        <a href="{% url 'breakdown:breakdown_detail' breakdown_id=document.breakdowns.first.id %}" 
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye"></i> View
-                                        </a>
-                                    {% endif %}
+                                    <div class="btn-group" role="group">
+                                        {% if document.status == 'completed' and document.breakdowns.exists %}
+                                            <a href="{% url 'breakdown:breakdown_detail' breakdown_id=document.breakdowns.first.id %}" 
+                                               class="btn btn-sm btn-outline-primary" title="View Breakdown">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        {% endif %}
+                                        {% if document.is_original %}
+                                            <a href="{% url 'breakdown:delete_document' document_id=document.id %}" 
+                                               class="btn btn-sm btn-outline-danger" title="Delete Document"
+                                               onclick="return confirm('Are you sure you want to delete this document and all its generated files?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        {% else %}
+                                            <a href="{% url 'breakdown:delete_document' document_id=document.id %}" 
+                                               class="btn btn-sm btn-outline-danger" title="Delete Generated File"
+                                               onclick="return confirm('Are you sure you want to delete this generated file?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
