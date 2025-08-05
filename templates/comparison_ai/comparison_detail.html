@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ comparison.title }} - Comparison Detail{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-balance-scale"></i> {{ comparison.title }}
+                    </h4>
+                    <div>
+                        <a href="{% url 'comparison_ai:comparison_viewer' comparison.id %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-chart-bar"></i> Analysis Viewer
+                        </a>
+                        <a href="{% url 'comparison_ai:home' %}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Comparison Info -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6>Comparison Information</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Title:</strong> {{ comparison.title }}</li>
+                                <li><strong>Status:</strong> 
+                                    <span class="badge bg-{% if comparison.status == 'completed' %}success{% elif comparison.status == 'processing' %}warning{% elif comparison.status == 'failed' %}danger{% else %}secondary{% endif %}">
+                                        {{ comparison.status|title }}
+                                    </span>
+                                </li>
+                                <li><strong>Created:</strong> {{ comparison.created_at|date:"M d, Y H:i" }}</li>
+                                <li><strong>Updated:</strong> {{ comparison.updated_at|date:"M d, Y H:i" }}</li>
+                                {% if comparison.description %}
+                                    <li><strong>Description:</strong> {{ comparison.description }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Documents in Comparison</h6>
+                            <ul class="list-unstyled">
+                                {% for comp_doc in comparison.documents.all %}
+                                <li>
+                                    <i class="fas fa-file"></i> 
+                                    <strong>{{ comp_doc.document.title }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        Order: {{ comp_doc.order + 1 }} | 
+                                        Type: {{ comp_doc.document.file_type|upper }} | 
+                                        Status: {{ comp_doc.document.status|title }}
+                                    </small>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Analysis Actions -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6>AI Analysis Options</h6>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-primary" onclick="runAnalysis('similarity')">
+                                    <i class="fas fa-link"></i> Similarity Analysis
+                                </button>
+                                <button type="button" class="btn btn-outline-info" onclick="runAnalysis('differences')">
+                                    <i class="fas fa-unlink"></i> Differences Analysis
+                                </button>
+                                <button type="button" class="btn btn-outline-success" onclick="runAnalysis('summary')">
+                                    <i class="fas fa-list"></i> Summary Comparison
+                                </button>
+                                <button type="button" class="btn btn-outline-warning" onclick="runAnalysis('key_points')">
+                                    <i class="fas fa-key"></i> Key Points Comparison
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="showCustomPrompt()">
+                                    <i class="fas fa-magic"></i> Custom Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Existing Analyses -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Analysis Results</h6>
+                            {% if analyses %}
+                                {% for analysis in analyses %}
+                                <div class="card mb-3">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-chart-bar"></i> 
+                                            {{ analysis.analysis_type|title|replace:"_":" " }}
+                                        </h6>
+                                        <div>
+                                            <span class="badge bg-{% if analysis.status == 'completed' %}success{% elif analysis.status == 'processing' %}warning{% else %}danger{% endif %}">
+                                                {{ analysis.status|title }}
+                                            </span>
+                                            <small class="text-muted ms-2">{{ analysis.created_at|date:"M d, Y H:i" }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if analysis.status == 'completed' %}
+                                            <div class="analysis-content">
+                                                {% if analysis.content.sections %}
+                                                    {% for section in analysis.content.sections %}
+                                                    <div class="mb-3">
+                                                        <h6 class="text-primary">Section {{ forloop.counter }}</h6>
+                                                        <p>{{ section|linebreaks }}</p>
+                                                    </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <p>{{ analysis.raw_analysis|linebreaks }}</p>
+                                                {% endif %}
+                                            </div>
+                                        {% elif analysis.status == 'processing' %}
+                                            <div class="text-center py-3">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2">Analysis in progress...</p>
+                                            </div>
+                                        {% else %}
+                                            <div class="alert alert-danger">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                Analysis failed. Please try again.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No analyses yet</h5>
+                                    <p class="text-muted">Run an AI analysis to compare your documents.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Prompt Modal -->
+<div class="modal fade" id="customPromptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Custom Analysis Prompt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="custom-prompt" class="form-label">Your Custom Analysis Prompt</label>
+                    <textarea class="form-control" id="custom-prompt" rows="6" 
+                              placeholder="Enter your custom prompt for AI analysis of these documents..."></textarea>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Tip:</strong> Be specific about what aspects you want to compare or analyze. 
+                    The AI will have access to all the documents in this comparison.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="runCustomAnalysis()">
+                    <i class="fas fa-paper-plane"></i> Run Analysis
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function runAnalysis(analysisType) {
+    if (confirm(`Are you sure you want to run ${analysisType.replace('_', ' ')} analysis?`)) {
+        fetch(`{% url 'comparison_ai:run_analysis' comparison.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                analysis_type: analysisType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Analysis started successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while running the analysis.');
+        });
+    }
+}
+
+function showCustomPrompt() {
+    new bootstrap.Modal(document.getElementById('customPromptModal')).show();
+}
+
+function runCustomAnalysis() {
+    const prompt = document.getElementById('custom-prompt').value;
+    if (!prompt.trim()) {
+        alert('Please enter a custom prompt.');
+        return;
+    }
+    
+    fetch(`{% url 'comparison_ai:run_analysis' comparison.id %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            analysis_type: 'custom',
+            custom_prompt: prompt
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Custom analysis started successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while running the custom analysis.');
+    });
+}
+</script>
+{% endblock %} 
