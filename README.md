@@ -222,32 +222,7 @@ LOG_FILE=logs/app.log
    - TNGTech models use the `OPENROUTE_API_KEY_TNGTECH`
    - OpenRouter models use the `OPENROUTE_API_KEY_OPENROUTER`
 
-### Example .env File
 
-Here's a complete example with the current AI models and API keys:
-
-```env
-# Django Configuration
-DEBUG=True
-SECRET_KEY=django-insecure-development-key-change-in-production
-ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
-
-# AI Configuration (OpenRoute AI)
-OPENROUTE_HOST=https://openrouter.ai/api/v1
-OPENROUTE_API_KEY_DEEPSEEK=apikey
-OPENROUTE_API_KEY_TNGTECH=apikey
-OPENROUTE_API_KEY_OPENROUTER=apikey
-BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
-REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
-FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
-REANALYZER_MODEL=openrouter/horizon-beta
-
-# Database Configuration
-DATABASE_URL=sqlite:///db.sqlite3
-
-# Logging Configuration
-LOG_LEVEL=INFO
-LOG_FILE=logs/app.log
 ```
 
 ## 📖 Usage
