@@ -48,14 +48,14 @@ fi
 
 # Check if the API endpoint is available
 echo "🔍 Checking LM Studio API endpoint..."
-if curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
-    echo "✅ LM Studio API is responding at http://127.0.0.1:11434"
+if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+    echo "✅ LM Studio API is responding at http://192.168.0.34:1234"
 else
     echo "⚠️  LM Studio API not responding yet. Please:"
     echo "   1. Open LM Studio manually"
     echo "   2. Load one of your models"
     echo "   3. Start the local server in LM Studio"
-    echo "   4. Make sure it's running on http://127.0.0.1:11434"
+    echo "   4. Make sure it's running on http://192.168.0.34:1234"
 fi
 
 echo ""
@@ -66,4 +66,4 @@ echo "   - whiterabbitneo-2.5-qwen-2.5-coder-7b"
 echo "   - llama-3-8b-gpt-40-ru1.0"
 echo "   - h2o-danube2-1.8b-chat"
 echo ""
-echo "🔗 API endpoint: http://127.0.0.1:11434"
+echo "🔗 API endpoint: http://192.168.0.34:1234"

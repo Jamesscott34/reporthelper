@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block title %}Breakdown - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">
+                    <i class="fas fa-file-alt text-primary"></i>
+                    {{ document.title }}
+                </h1>
+                <p class="text-muted mb-0">
+                    AI Breakdown • {{ breakdown.created_at|date:"M d, Y H:i" }}
+                </p>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" onclick="regenerateBreakdown()">
+                    <i class="fas fa-sync-alt"></i> Regenerate
+                </button>
+                <a href="{% url 'breakdown:document_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+
+        <!-- Document Info -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Document Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>File Type:</strong> {{ document.file_type|upper }}</p>
+                        <p><strong>Uploaded:</strong> {{ document.uploaded_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Status:</strong> 
+                            {% if document.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif document.status == 'processing' %}
+                                <span class="badge bg-warning">Processing</span>
+                            {% elif document.status == 'failed' %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% else %}
+                                <span class="badge bg-info">Uploaded</span>
+                            {% endif %}
+                        </p>
+                        <p><strong>AI Model:</strong> {{ breakdown.ai_model_used }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Breakdown Content -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list-ul"></i> AI Breakdown
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="breakdown-content">
+                    {% if breakdown.content.sections %}
+                        {% for section in breakdown.content.sections %}
+                        <div class="breakdown-section mb-4">
+                            <h6 class="text-primary">
+                                <i class="fas fa-chevron-right"></i>
+                                {{ section.title }}
+                            </h6>
+                            {% if section.content %}
+                                <p class="mb-2">{{ section.content }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Raw breakdown display -->
+                        <div class="breakdown-raw">
+                            <pre class="bg-light p-3 rounded">{{ breakdown.raw_breakdown }}</pre>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs"></i> Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <a href="#" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-edit"></i> Edit Breakdown
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="#" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-eye"></i> Review
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="#" class="btn btn-info w-100 mb-2">
+                            <i class="fas fa-file-export"></i> Export
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 mb-0">Regenerating breakdown...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function regenerateBreakdown() {
+    if (confirm('Are you sure you want to regenerate the breakdown? This will replace the current version.')) {
+        // Show loading modal
+        $('#loadingModal').modal('show');
+        
+        $.ajax({
+            url: '{% url "breakdown:regenerate_breakdown" breakdown_id=breakdown.id %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                $('#loadingModal').modal('hide');
+                if (response.success) {
+                    // Reload the page to show new breakdown
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                $('#loadingModal').modal('hide');
+                alert('Error regenerating breakdown. Please try again.');
+            }
+        });
+    }
+}
+
+// Add CSRF token to all AJAX requests
+$.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+        if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+            xhr.setRequestHeader("X-CSRFToken", $('[name=csrfmiddlewaretoken]').val());
+        }
+    }
+});
+</script>
+{% endblock %} 

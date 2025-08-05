@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Report Writer - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <!-- Hero Section -->
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-robot text-primary"></i>
+                AI Report Writer
+            </h1>
+            <p class="lead text-muted">
+                Transform your documents into structured, step-by-step reports using AI
+            </p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload"></i> Upload Document
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'breakdown:upload_document' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="document" class="form-label">Select Document</label>
+                        <input type="file" class="form-control" id="document" name="document" 
+                               accept=".pdf,.docx,.doc,.txt" required>
+                        <div class="form-text">
+                            Supported formats: PDF, DOCX, DOC, TXT (Max 50MB)
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload & Process
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recent Documents -->
+        {% if documents %}
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock"></i> Recent Documents
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for document in documents %}
+                            <tr>
+                                <td>
+                                    <strong>{{ document.title }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ document.file_type|upper }}</span>
+                                </td>
+                                <td>
+                                    {% if document.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif document.status == 'processing' %}
+                                        <span class="badge bg-warning">Processing</span>
+                                    {% elif document.status == 'failed' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Uploaded</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ document.uploaded_at|date:"M d, Y" }}</td>
+                                <td>
+                                    {% if document.status == 'completed' %}
+                                        <a href="{% url 'breakdown:breakdown_detail' breakdown_id=document.breakdowns.first.id %}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Features Section -->
+        <div class="row mt-5">
+            <div class="col-md-4">
+                <div class="text-center">
+                    <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                    <h5>AI-Powered Analysis</h5>
+                    <p class="text-muted">
+                        Advanced AI models break down complex documents into clear, structured content.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <i class="fas fa-edit fa-3x text-primary mb-3"></i>
+                    <h5>Interactive Review</h5>
+                    <p class="text-muted">
+                        Review and edit breakdowns with our intuitive web interface.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <i class="fas fa-file-export fa-3x text-primary mb-3"></i>
+                    <h5>Export Options</h5>
+                    <p class="text-muted">
+                        Export your reports as DOCX or PDF files for easy sharing.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // File upload preview
+    $('#document').change(function() {
+        var fileName = $(this).val().split('\\').pop();
+        if (fileName) {
+            $(this).next('.form-text').html('Selected file: ' + fileName);
+        }
+    });
+});
+</script>
+{% endblock %} 
