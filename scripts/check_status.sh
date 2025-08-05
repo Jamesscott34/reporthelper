@@ -79,13 +79,11 @@ check_lm_studio() {
         echo -e "${YELLOW}⚠️  LM Studio is not running${NC}"
     fi
     
-    # Check API endpoint
-    if command -v curl &> /dev/null; then
-        if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
-            echo -e "${GREEN}✅ LM Studio API responding at http://192.168.0.34:1234${NC}"
-        else
-            echo -e "${YELLOW}⚠️  LM Studio API not responding at http://192.168.0.34:1234${NC}"
-        fi
+    # Check LM Studio API
+    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ LM Studio API: Responding${NC}"
+    else
+        echo -e "${RED}❌ LM Studio API: Not responding${NC}"
     fi
 }
 

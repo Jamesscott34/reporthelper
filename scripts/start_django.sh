@@ -304,7 +304,7 @@ start_lm_studio() {
     fi
     
     # Check API endpoint
-    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
         print_success "LM Studio API responding"
     else
         print_warning "LM Studio API not responding"

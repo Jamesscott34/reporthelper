@@ -23,13 +23,13 @@ test_api_endpoint() {
     echo -e "${BLUE}🔍 Testing API endpoint: $LM_STUDIO_ENDPOINT${NC}"
     
     if command -v curl &> /dev/null; then
-        # Test basic connectivity
-        if curl -s --connect-timeout 5 "$LM_STUDIO_ENDPOINT/api/tags" > /dev/null 2>&1; then
+        # Test basic connectivity using the correct models endpoint
+        if curl -s --connect-timeout 5 "$LM_STUDIO_ENDPOINT/v1/models" > /dev/null 2>&1; then
             echo -e "${GREEN}✅ API endpoint is responding${NC}"
             
             # Get available models
             echo -e "${BLUE}📋 Available models:${NC}"
-            curl -s "$LM_STUDIO_ENDPOINT/api/tags" | python3 -m json.tool 2>/dev/null || echo "Raw response: $(curl -s "$LM_STUDIO_ENDPOINT/api/tags")"
+            curl -s "$LM_STUDIO_ENDPOINT/v1/models" | python3 -m json.tool 2>/dev/null || echo "Raw response: $(curl -s "$LM_STUDIO_ENDPOINT/v1/models")"
             
             return 0
         else
@@ -46,34 +46,36 @@ test_api_endpoint() {
 test_model_generation() {
     echo -e "${BLUE}🤖 Testing model generation...${NC}"
     
-    # Test with a simple prompt
+    # Test with a simple prompt using chat completions
     TEST_PROMPT="Hello, this is a test. Please respond with 'Test successful' if you can see this message."
     
     if command -v curl &> /dev/null; then
-        # Create a test request
+        # Create a test request using OpenAI-compatible format
         TEST_REQUEST=$(cat <<EOF
 {
     "model": "deepseek-r1-distill-qwen-7b",
-    "prompt": "$TEST_PROMPT",
+    "messages": [
+        {
+            "role": "user",
+            "content": "$TEST_PROMPT"
+        }
+    ],
     "stream": false,
-    "options": {
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "max_tokens": 50
-    }
+    "temperature": 0.7,
+    "max_tokens": 50
 }
 EOF
 )
         
-        # Send test request
-        RESPONSE=$(curl -s -X POST "$LM_STUDIO_ENDPOINT/api/generate" \
+        # Send test request to chat completions endpoint
+        RESPONSE=$(curl -s -X POST "$LM_STUDIO_ENDPOINT/v1/chat/completions" \
             -H "Content-Type: application/json" \
             -d "$TEST_REQUEST" 2>/dev/null || echo "{}")
         
-        if echo "$RESPONSE" | grep -q "response"; then
+        if echo "$RESPONSE" | grep -q "choices"; then
             echo -e "${GREEN}✅ Model generation test successful${NC}"
             echo -e "${BLUE}📝 Response preview:${NC}"
-            echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('response', 'No response')[:100] + '...')" 2>/dev/null || echo "Response received"
+            echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('choices', [{}])[0].get('message', {}).get('content', 'No response')[:100] + '...')" 2>/dev/null || echo "Response received"
         else
             echo -e "${YELLOW}⚠️  Model generation test failed or no response${NC}"
             echo -e "${BLUE}📝 Raw response:${NC}"
@@ -113,45 +115,34 @@ check_network() {
 
 # Function to display summary
 display_summary() {
-    echo -e "${BLUE}"
-    echo "📊 Test Summary"
-    echo "==============="
-    echo -e "${NC}"
+    echo -e "${BLUE}📊 Test Summary${NC}"
+    echo -e "${BLUE}==============${NC}"
     
-    echo -e "${GREEN}✅ LM Studio connection test completed!${NC}"
-    echo ""
-    echo "🔗 Endpoint: $LM_STUDIO_ENDPOINT"
-    echo ""
-    echo "💡 If tests failed:"
-    echo "1. Ensure LM Studio is running"
-    echo "2. Check if local server is started in LM Studio"
-    echo "3. Verify the IP address and port are correct"
-    echo "4. Check firewall settings"
-    echo ""
-    echo "🚀 Next steps:"
-    echo "1. Start Django: ./scripts/start_django.sh"
-    echo "2. Test document upload and processing"
-    echo -e "${NC}"
+    # Check if LM Studio is running
+    if pgrep -f "LM-Studio" > /dev/null; then
+        echo -e "${GREEN}✅ LM Studio process is running${NC}"
+    else
+        echo -e "${RED}❌ LM Studio process is not running${NC}"
+    fi
+    
+    # Check API connectivity
+    if curl -s "$LM_STUDIO_ENDPOINT/v1/models" > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ LM Studio API is accessible${NC}"
+    else
+        echo -e "${RED}❌ LM Studio API is not accessible${NC}"
+    fi
 }
 
 # Main execution
 main() {
-    echo -e "${BLUE}Starting LM Studio connection test...${NC}"
-    
-    # Check network connectivity
     check_network
-    
-    # Test API endpoint
-    if test_api_endpoint; then
-        # Test model generation
-        test_model_generation
-    else
-        echo -e "${RED}❌ Cannot connect to LM Studio API${NC}"
-    fi
-    
-    # Display summary
+    echo ""
+    test_api_endpoint
+    echo ""
+    test_model_generation
+    echo ""
     display_summary
 }
 
 # Run main function
-main "$@" 
+main 

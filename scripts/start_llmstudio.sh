@@ -48,7 +48,7 @@ fi
 
 # Check if the API endpoint is available
 echo "🔍 Checking LM Studio API endpoint..."
-if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
     echo "✅ LM Studio API is responding at http://192.168.0.34:1234"
 else
     echo "⚠️  LM Studio API not responding yet. Please:"

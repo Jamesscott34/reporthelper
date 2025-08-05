@@ -164,13 +164,25 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # AI Configuration
-OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://192.168.0.34:1234')  # LM Studio endpoint
-OLLAMA_MODELS = {
-    'breakdown': os.getenv('BREAKDOWN_MODEL', 'deepseek-r1-distill-qwen-7b'),
-    'reviewer': os.getenv('REVIEWER_MODEL', 'whiterabbitneo-2.5-qwen-2.5-coder-7b'),
-    'finalizer': os.getenv('FINALIZER_MODEL', 'llama-3-8b-gpt-40-ru1.0'),
-    'reanalyzer': os.getenv('REANALYZER_MODEL', 'h2o-danube2-1.8b-chat'),
+OPENROUTE_HOST = os.getenv('OPENROUTE_HOST', 'https://openrouter.ai/api/v1')  # OpenRoute endpoint
+
+# API Keys for different models
+OPENROUTE_API_KEYS = {
+    'deepseek': os.getenv('OPENROUTE_API_KEY_DEEPSEEK', ''),
+    'tngtech': os.getenv('OPENROUTE_API_KEY_TNGTECH', ''),
+    'openrouter': os.getenv('OPENROUTE_API_KEY_OPENROUTER', ''),
 }
+
+OPENROUTE_MODELS = {
+    'breakdown': os.getenv('BREAKDOWN_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
+    'reviewer': os.getenv('REVIEWER_MODEL', 'tngtech/deepseek-r1t2-chimera:free'),
+    'finalizer': os.getenv('FINALIZER_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
+    'reanalyzer': os.getenv('REANALYZER_MODEL', 'openrouter/horizon-beta'),
+}
+
+# Backward compatibility for existing code
+OLLAMA_HOST = OPENROUTE_HOST
+OLLAMA_MODELS = OPENROUTE_MODELS
 
 # File upload settings
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB

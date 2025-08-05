@@ -109,10 +109,99 @@
     background: #007bff;
     color: white;
 }
+
+/* Loading Screen Styles */
+.loading-screen {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem;
+    border-radius: 15px;
+    text-align: center;
+    margin: 2rem 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.loading-spinner {
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: rgba(255,255,255,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fff, #f0f0f0);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin: 2rem 0;
+    font-size: 0.9rem;
+}
+
+.step {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin: 0 0.25rem;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: rgba(255,255,255,0.9);
+    color: #333;
+    border-color: white;
+    transform: scale(1.05);
+}
+
+.step.completed {
+    background: rgba(40, 167, 69, 0.8);
+    color: white;
+    border-color: #28a745;
+}
+
+.status-message {
+    font-size: 1.1rem;
+    margin: 1rem 0;
+    font-weight: 300;
+}
+
+.model-info {
+    background: rgba(255,255,255,0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    display: inline-block;
+    margin-top: 1rem;
+}
 </style>
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid mt-4">
     <div class="row">
         <!-- Main Content -->
@@ -158,7 +247,102 @@
                     <!-- Full Breakdown Content -->
                     <div id="breakdown-content">
                         <h5><i class="fas fa-list-ul"></i> Full Breakdown</h5>
-                        {% if breakdown.content.sections %}
+                        
+                        {% if breakdown.status == 'processing' %}
+                            <!-- Loading Screen -->
+                            <div class="loading-screen">
+                                <div class="loading-spinner"></div>
+                                <h3>Processing Document with AI</h3>
+                                <p class="status-message">This may take a few moments depending on the document size...</p>
+                                
+                                <div class="step-indicator">
+                                    <div class="step active" id="step1">
+                                        <i class="fas fa-upload"></i><br>
+                                        Upload
+                                    </div>
+                                    <div class="step" id="step2">
+                                        <i class="fas fa-file-text"></i><br>
+                                        Extract Text
+                                    </div>
+                                    <div class="step" id="step3">
+                                        <i class="fas fa-robot"></i><br>
+                                        AI Analysis
+                                    </div>
+                                    <div class="step" id="step4">
+                                        <i class="fas fa-eye"></i><br>
+                                        View Results
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                
+                                <div id="statusMessage" class="status-message">Initializing...</div>
+                                <div class="model-info">
+                                    <i class="fas fa-brain"></i> Using AI Model: {{ breakdown.ai_model_used }} (OpenRoute AI)
+                                </div>
+                            </div>
+                            
+                            <script>
+                                // Start progress animation
+                                startProgress();
+                                
+                                // Check for updates every 2 seconds
+                                setInterval(function() {
+                                    checkBreakdownStatus();
+                                }, 2000);
+                                
+                                function startProgress() {
+                                    updateStep(1);
+                                    updateProgress(0);
+                                    updateStatus('Starting processing...');
+                                    
+                                    // Simulate progress updates
+                                    setTimeout(function() {
+                                        updateStep(2);
+                                        updateProgress(25);
+                                        updateStatus('Extracting text from document...');
+                                    }, 1000);
+                                    
+                                    setTimeout(function() {
+                                        updateStep(3);
+                                        updateProgress(50);
+                                        updateStatus('Analyzing document with AI...');
+                                    }, 3000);
+                                }
+                                
+                                function updateProgress(percent) {
+                                    $('#progressFill').css('width', percent + '%');
+                                }
+                                
+                                function updateStep(stepNumber) {
+                                    $('.step').removeClass('active completed');
+                                    
+                                    for (var i = 1; i < stepNumber; i++) {
+                                        $('#step' + i).addClass('completed');
+                                    }
+                                    
+                                    $('#step' + stepNumber).addClass('active');
+                                }
+                                
+                                function updateStatus(message) {
+                                    $('#statusMessage').text(message);
+                                }
+                                
+                                function checkBreakdownStatus() {
+                                    $.ajax({
+                                        url: '{% url "breakdown:breakdown_status" breakdown.id %}',
+                                        type: 'GET',
+                                        success: function(data) {
+                                            if (data.status === 'completed' || data.has_content || data.has_raw_breakdown) {
+                                                location.reload();
+                                            }
+                                        }
+                                    });
+                                }
+                            </script>
+                        {% elif breakdown.content.sections and breakdown.content.sections|length > 0 %}
                             {% for section in breakdown.content.sections %}
                                 <div class="breakdown-section" id="section-{{ forloop.counter }}">
                                     <div class="section-marker" onclick="addMarker({{ forloop.counter }}, '{{ section|truncatewords:10|escapejs }}')">
@@ -186,10 +370,21 @@
                             {% endfor %}
                         {% else %}
                             <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No structured breakdown content available.
-                                <div class="mt-2">
-                                    <strong>Raw Breakdown:</strong>
-                                    <pre class="bg-light p-3 rounded mt-2">{{ breakdown.raw_breakdown }}</pre>
+                                <i class="fas fa-info-circle"></i> <strong>AI Output Available</strong>
+                                <div class="mt-3">
+                                    <h6>Raw AI Breakdown:</h6>
+                                    <div class="bg-light p-3 rounded border" style="max-height: 400px; overflow-y: auto;">
+                                        {% if breakdown.raw_breakdown %}
+                                            {{ breakdown.raw_breakdown|linebreaks }}
+                                        {% else %}
+                                            <p class="text-muted">No AI breakdown content available. The document may still be processing or there was an issue with the AI generation.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" onclick="regenerateBreakdown()">
+                                        <i class="fas fa-sync-alt"></i> Regenerate Breakdown
+                                    </button>
                                 </div>
                             </div>
                         {% endif %}
@@ -513,6 +708,7 @@ function saveChanges() {
 
 function regenerateWithComments() {
     if (confirm('This will regenerate the breakdown taking into account your comments and markers. Continue?')) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         const commentsText = Object.entries(comments).map(([section, comment]) => 
             `Section ${section}: ${comment.text}`
         ).join('\n');
@@ -520,7 +716,7 @@ function regenerateWithComments() {
         fetch(`{% url 'breakdown:regenerate_with_comments' breakdown.id %}`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -532,6 +728,32 @@ function regenerateWithComments() {
         .then(data => {
             if (data.success) {
                 alert('Breakdown regenerated successfully with your comments!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while regenerating the breakdown.');
+        });
+    }
+}
+
+function regenerateBreakdown() {
+    if (confirm('This will regenerate the breakdown without taking into account your comments and markers. Continue?')) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        fetch(`{% url 'breakdown:regenerate_breakdown' breakdown.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Breakdown regenerated successfully!');
                 location.reload();
             } else {
                 alert('Error: ' + data.error);

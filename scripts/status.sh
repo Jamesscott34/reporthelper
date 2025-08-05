@@ -27,7 +27,7 @@ check_lm_studio_status() {
     fi
     
     # Check API endpoint
-    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
         echo -e "  ${GREEN}✅ API: Responding at http://192.168.0.34:1234${NC}"
     else
         echo -e "  ${RED}❌ API: Not responding${NC}"

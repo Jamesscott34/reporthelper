@@ -12,7 +12,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="document" class="form-label">Select Document</label>
@@ -26,7 +26,7 @@
                         <a href="{% url 'breakdown:home' %}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left"></i> Back
                         </a>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">
                             <i class="fas fa-upload"></i> Upload & Process
                         </button>
                     </div>
@@ -46,6 +46,33 @@ $(document).ready(function() {
         if (fileName) {
             $(this).next('.form-text').html('Selected file: ' + fileName);
         }
+    });
+    
+    // Handle form submission
+    $('#uploadForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Submit form via AJAX
+        var formData = new FormData(this);
+        
+        $.ajax({
+            url: '{% url "breakdown:upload_document" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Immediately redirect to breakdown viewer
+                    window.location.href = response.redirect_url;
+                } else {
+                    alert('Error: ' + response.error);
+                }
+            },
+            error: function(xhr, status, error) {
+                alert('Error uploading document: ' + error);
+            }
+        });
     });
 });
 </script>

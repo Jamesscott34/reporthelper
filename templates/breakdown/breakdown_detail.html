@@ -57,7 +57,7 @@
                     <div class="mt-3">
                         <h6>Breakdown Preview</h6>
                         <div class="border rounded p-3 bg-light" style="max-height: 300px; overflow-y: auto;">
-                            {% if breakdown.content.sections %}
+                            {% if breakdown.content.sections and breakdown.content.sections|length > 0 %}
                                 {% for section in breakdown.content.sections %}
                                     <div class="mb-2">
                                         <strong>{{ forloop.counter }}.</strong> {{ section|truncatewords:50 }}
@@ -69,7 +69,21 @@
                                     </a>
                                 </div>
                             {% else %}
-                                <p class="text-muted">No breakdown content available.</p>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> <strong>AI Output Available</strong>
+                                    <div class="mt-2">
+                                        {% if breakdown.raw_breakdown %}
+                                            <p class="text-muted">Raw AI breakdown content is available. Click below to view the full breakdown.</p>
+                                        {% else %}
+                                            <p class="text-muted">No AI breakdown content available. The document may still be processing or there was an issue with the AI generation.</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mt-2">
+                                        <a href="{% url 'breakdown:breakdown_viewer' breakdown.id %}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-eye"></i> View Full Breakdown
+                                        </a>
+                                    </div>
+                                </div>
                             {% endif %}
                         </div>
                     </div>

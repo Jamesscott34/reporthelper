@@ -9,11 +9,12 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.conf import settings
+from django.urls import reverse
 import json
 import os
+import threading
 
 from .models import Document, Breakdown
 from .ai_breakdown import AIBreakdownService
@@ -37,12 +38,79 @@ def home(request):
     })
 
 
+def process_document_background(document_id, breakdown_id):
+    """
+    Background function to process document and update breakdown.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        breakdown = Breakdown.objects.get(id=breakdown_id)
+        
+        # Update status to processing
+        document.status = 'processing'
+        document.save()
+        
+        # Extract text from the document
+        print(f"Extracting text from {document.file.path}...")
+        extracted_text = extract_text_from_file(
+            document.file.path,
+            document.file_type
+        )
+        
+        if not extracted_text or len(extracted_text.strip()) < 10:
+            raise Exception("No text could be extracted from the document")
+        
+        document.extracted_text = extracted_text
+        document.status = 'completed'
+        document.save()
+        
+        print(f"Text extracted successfully. Length: {len(extracted_text)} characters")
+        
+        # Generate AI breakdown
+        ai_service = AIBreakdownService()
+        breakdown_result = ai_service.breakdown_document(extracted_text)
+        
+        if breakdown_result['success']:
+            # Update breakdown with results
+            breakdown.content = breakdown_result['breakdown']
+            breakdown.raw_breakdown = breakdown_result['raw_response']
+            breakdown.ai_model_used = breakdown_result['model_used']
+            breakdown.status = 'completed'
+            breakdown.save()
+            
+            print(f"Breakdown completed successfully for document {document.title}")
+        else:
+            breakdown.status = 'failed'
+            breakdown.save()
+            document.status = 'failed'
+            document.save()
+            print(f"Failed to process document: {breakdown_result['error']}")
+            
+    except Exception as e:
+        print(f"Error processing document {document_id}: {str(e)}")
+        try:
+            document = Document.objects.get(id=document_id)
+            document.status = 'failed'
+            document.save()
+            
+            breakdown = Breakdown.objects.get(id=breakdown_id)
+            breakdown.status = 'failed'
+            breakdown.save()
+        except:
+            pass
+
+
 def upload_document(request):
     """
     Handle document upload and initiate AI breakdown.
     """
     if request.method == 'POST':
         if 'document' not in request.FILES:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Please select a file to upload.'
+                })
             messages.error(request, 'Please select a file to upload.')
             return redirect('breakdown:home')
         
@@ -50,9 +118,17 @@ def upload_document(request):
         
         # Validate file type
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-        allowed_extensions = [ext.lower() for ext in settings.ALLOWED_FILE_TYPES]
+        allowed_extensions = [
+            ext.lower() for ext in settings.ALLOWED_FILE_TYPES
+        ]
         if file_extension not in allowed_extensions:
-            messages.error(request, f'File type {file_extension} is not supported. Allowed types: {", ".join(allowed_extensions)}')
+            error_msg = (
+                f'File type {file_extension} is not supported. '
+                f'Allowed types: {", ".join(allowed_extensions)}'
+            )
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg})
+            messages.error(request, error_msg)
             return redirect('breakdown:home')
         
         # Create document record
@@ -64,47 +140,37 @@ def upload_document(request):
             status='processing'
         )
         
-        try:
-            # Extract text from the document
-            print(f"Extracting text from {document.file.path}...")
-            extracted_text = extract_text_from_file(document.file.path, document.file_type)
-            
-            if not extracted_text or len(extracted_text.strip()) < 10:
-                raise Exception("No text could be extracted from the document")
-            
-            document.extracted_text = extracted_text
-            document.status = 'completed'
-            document.save()
-            
-            print(f"Text extracted successfully. Length: {len(extracted_text)} characters")
-            
-            # Generate AI breakdown
-            ai_service = AIBreakdownService()
-            breakdown_result = ai_service.breakdown_document(extracted_text)
-            
-            if breakdown_result['success']:
-                # Create breakdown record
-                breakdown = Breakdown.objects.create(
-                    document=document,
-                    content=breakdown_result['breakdown'],
-                    raw_breakdown=breakdown_result['raw_response'],
-                    ai_model_used=breakdown_result['model_used']
-                )
-                
-                messages.success(request, 'Document uploaded and processed successfully!')
-                return redirect('breakdown:breakdown_detail', breakdown_id=breakdown.id)
-            else:
-                document.status = 'failed'
-                document.save()
-                messages.error(request, f'Failed to process document: {breakdown_result["error"]}')
-                
-        except Exception as e:
-            document.status = 'failed'
-            document.save()
-            messages.error(request, f'Error processing document: {str(e)}')
-            print(f"Error processing document: {str(e)}")
+        # Create a placeholder breakdown immediately
+        placeholder_breakdown = Breakdown.objects.create(
+            document=document,
+            content={'sections': []},
+            raw_breakdown='',
+            status='processing',
+            ai_model_used='deepseek/deepseek-coder-33b-instruct'
+        )
         
-        return redirect('breakdown:home')
+        # Start background processing
+        thread = threading.Thread(
+            target=process_document_background,
+            args=(document.id, placeholder_breakdown.id)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        # Redirect immediately to breakdown viewer
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Document uploaded successfully!',
+                'redirect_url': reverse(
+                    'breakdown:breakdown_viewer',
+                    kwargs={'breakdown_id': placeholder_breakdown.id}
+                ),
+                'breakdown_id': placeholder_breakdown.id
+            })
+        
+        # For non-AJAX requests, redirect immediately
+        return redirect('breakdown:breakdown_viewer', breakdown_id=placeholder_breakdown.id)
     
     return render(request, 'breakdown/upload.html')
 
@@ -337,3 +403,75 @@ def delete_document(request, document_id):
     return render(request, 'breakdown/delete_confirm.html', {
         'document': document
     })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def upload_progress(request, document_id):
+    """
+    Get the progress of document processing.
+    """
+    try:
+        document = get_object_or_404(Document, id=document_id)
+        
+        progress_data = {
+            'status': document.status,
+            'progress': 0,
+            'message': ''
+        }
+        
+        if document.status == 'uploaded':
+            progress_data.update({
+                'progress': 25,
+                'message': 'Document uploaded, extracting text...'
+            })
+        elif document.status == 'processing':
+            progress_data.update({
+                'progress': 50,
+                'message': 'Extracting text from document...'
+            })
+        elif document.status == 'completed':
+            progress_data.update({
+                'progress': 75,
+                'message': 'Generating AI breakdown...'
+            })
+        elif document.status == 'failed':
+            progress_data.update({
+                'progress': 0,
+                'message': 'Processing failed'
+            })
+        
+        return JsonResponse(progress_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'progress': 0,
+            'message': str(e)
+        })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def breakdown_status(request, breakdown_id):
+    """
+    Check the status of a breakdown.
+    """
+    try:
+        breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+        
+        status_data = {
+            'status': breakdown.status,
+            'has_content': bool(breakdown.content.get('sections', [])),
+            'has_raw_breakdown': bool(breakdown.raw_breakdown),
+            'document_status': breakdown.document.status,
+            'ai_model_used': breakdown.ai_model_used
+        }
+        
+        return JsonResponse(status_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'error': str(e)
+        })

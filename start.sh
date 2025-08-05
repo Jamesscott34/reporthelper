@@ -61,15 +61,20 @@ check_system_requirements() {
         exit 1
     fi
     
-    # Check for required system tools
+    # Check for required system tools (only show warnings for missing ones)
     tools=("curl" "git" "libreoffice")
+    missing_tools=()
     for tool in "${tools[@]}"; do
-        if command -v "$tool" &> /dev/null; then
-            print_success "$tool: Available"
-        else
-            print_warning "$tool: Not found (may not be installed)"
+        if ! command -v "$tool" &> /dev/null; then
+            missing_tools+=("$tool")
         fi
     done
+    
+    if [ ${#missing_tools[@]} -eq 0 ]; then
+        print_success "All system tools available"
+    else
+        print_warning "Missing tools (optional): ${missing_tools[*]}"
+    fi
 }
 
 # Function to create virtual environment if needed
@@ -200,10 +205,13 @@ check_python_packages() {
 setup_environment() {
     print_status "Setting up environment variables..."
     
-    # Load .env file if it exists
+    # Load .env file if it exists (suppress output)
     if [ -f ".env" ]; then
-        print_status "Loading environment variables from .env"
-        export $(grep -v '^#' .env | xargs)
+        # Load environment variables silently
+        set -a
+        source .env
+        set +a
+        print_success "Environment variables loaded from .env"
     else
         print_warning ".env file not found, using defaults"
         export DEBUG=True
@@ -211,8 +219,6 @@ setup_environment() {
         export ALLOWED_HOSTS=localhost,127.0.0.1
         export OLLAMA_HOST=http://192.168.0.34:1234
     fi
-    
-    print_success "Environment variables set"
 }
 
 # Function to check for updates
@@ -306,10 +312,13 @@ make_scripts_executable() {
 start_lm_studio() {
     print_status "Checking LM Studio..."
     
-    # Check if LM Studio API is responding
-    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+    # Check LM Studio API
+    print_status "Checking LM Studio API..."
+    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
         print_success "LM Studio API is responding"
-        return 0
+    else
+        print_warning "LM Studio API not responding"
+        print_status "Please ensure LM Studio is running with local server enabled"
     fi
     
     # Check if LM Studio process is running (multiple possible names)
@@ -319,7 +328,7 @@ start_lm_studio() {
         
         # Wait up to 30 seconds for LM Studio to start
         for i in {1..30}; do
-            if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+            if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
                 print_success "LM Studio API is now responding"
                 return 0
             fi
@@ -342,7 +351,7 @@ start_lm_studio() {
         # Wait for LM Studio to start
         print_status "Waiting for LM Studio to start up..."
         for i in {1..60}; do
-            if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+            if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
                 print_success "LM Studio started successfully (PID: $LM_STUDIO_PID)"
                 return 0
             fi
@@ -356,7 +365,7 @@ start_lm_studio() {
     fi
     
     # Final check
-    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+    if curl -s http://192.168.0.34:1234/v1/models > /dev/null 2>&1; then
         print_success "LM Studio API is responding"
     else
         print_warning "LM Studio API not responding - you may need to start it manually"

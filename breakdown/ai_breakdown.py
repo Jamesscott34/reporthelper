@@ -1,7 +1,7 @@
 """
 AI Breakdown Service
 
-This module handles the communication with Ollama for breaking down documents
+This module handles the communication with OpenRoute AI for breaking down documents
 into step-by-step instructions.
 """
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class AIBreakdownService:
     """
-    Service class for handling AI-powered document breakdown.
+    Service class for handling AI-powered document breakdown using OpenRoute AI.
     """
     
     def __init__(self, model_name: str = None):
@@ -25,15 +25,29 @@ class AIBreakdownService:
         Initialize the AI breakdown service.
         
         Args:
-            model_name: Name of the Ollama model to use
+            model_name: Name of the OpenRoute AI model to use
         """
-        self.host = settings.OLLAMA_HOST
-        self.model = model_name or settings.OLLAMA_MODELS['breakdown']
-        self.base_url = f"{self.host}/api/generate"
+        self.host = settings.OPENROUTE_HOST
+        self.model = model_name or settings.OPENROUTE_MODELS['breakdown']
+        # Use OpenRoute AI's OpenAI-compatible endpoints
+        self.chat_url = f"{self.host}/chat/completions"
+        self.completions_url = f"{self.host}/completions"
+        self.models_url = f"{self.host}/models"
+        
+        # Determine which API key to use based on the model
+        if 'deepseek' in self.model:
+            self.api_key = settings.OPENROUTE_API_KEYS['deepseek']
+        elif 'tngtech' in self.model:
+            self.api_key = settings.OPENROUTE_API_KEYS['tngtech']
+        elif 'openrouter' in self.model:
+            self.api_key = settings.OPENROUTE_API_KEYS['openrouter']
+        else:
+            # Default to deepseek key
+            self.api_key = settings.OPENROUTE_API_KEYS['deepseek']
     
     def _make_request(self, prompt: str, max_retries: int = 3) -> Optional[str]:
         """
-        Make a request to Ollama API with retry logic.
+        Make a request to OpenRoute AI API with retry logic.
         
         Args:
             prompt: The prompt to send to the AI model
@@ -44,23 +58,40 @@ class AIBreakdownService:
         """
         for attempt in range(max_retries):
             try:
+                # Use chat completions endpoint for better results
                 payload = {
                     "model": self.model,
-                    "prompt": prompt,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
                     "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "top_p": 0.9,
-                        "max_tokens": 8000  # Increased from 4000 to allow longer responses
-                    }
+                    "temperature": 0.7,
+                    "max_tokens": 8000,
+                    "top_p": 0.9
                 }
                 
-                print(f"Making request to {self.base_url} with model {self.model}")
-                response = requests.post(self.base_url, json=payload, timeout=60)
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                    "HTTP-Referer": "http://localhost:8000",  # Required for OpenRoute
+                    "X-Title": "AI Report Writer"  # Optional but recommended
+                }
+                
+                print(f"Making request to {self.chat_url} with model {self.model}")
+                response = requests.post(self.chat_url, json=payload, headers=headers, timeout=120)
                 response.raise_for_status()
                 
                 result = response.json()
-                response_text = result.get('response', '')
+                
+                # Extract response from chat completions format
+                if 'choices' in result and len(result['choices']) > 0:
+                    response_text = result['choices'][0].get('message', {}).get('content', '')
+                else:
+                    # Fallback to completions format
+                    response_text = result.get('choices', [{}])[0].get('text', '')
                 
                 if response_text:
                     print(f"Successfully received response ({len(response_text)} characters)")
@@ -71,15 +102,38 @@ class AIBreakdownService:
             except requests.exceptions.RequestException as e:
                 print(f"Request failed on attempt {attempt + 1}: {e}")
                 if attempt == max_retries - 1:
-                    logger.error(f"Failed to make request to Ollama after {max_retries} attempts: {e}")
+                    logger.error(f"Failed to make request to OpenRoute AI after {max_retries} attempts: {e}")
                     return None
             except json.JSONDecodeError as e:
                 print(f"JSON decode failed on attempt {attempt + 1}: {e}")
                 if attempt == max_retries - 1:
-                    logger.error(f"Failed to parse Ollama response after {max_retries} attempts: {e}")
+                    logger.error(f"Failed to parse OpenRoute AI response after {max_retries} attempts: {e}")
                     return None
         
         return None
+    
+    def _check_models_available(self) -> bool:
+        """
+        Check if the required models are available in OpenRoute AI.
+        
+        Returns:
+            True if models are available, False otherwise
+        """
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "HTTP-Referer": "http://localhost:8000"
+            }
+            response = requests.get(self.models_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                models = response.json()
+                available_models = [model.get('id', '') for model in models.get('data', [])]
+                print(f"Available models: {available_models}")
+                return self.model in available_models
+            return False
+        except Exception as e:
+            print(f"Error checking models: {e}")
+            return False
     
     def breakdown_document(self, text: str) -> Dict[str, Any]:
         """
@@ -92,6 +146,10 @@ class AIBreakdownService:
             Dictionary containing the breakdown and metadata
         """
         print(f"Starting AI breakdown of document ({len(text)} characters)")
+        
+        # Check if models are available
+        if not self._check_models_available():
+            print("Warning: Model availability check failed, proceeding anyway...")
         
         # Clean and prepare the text
         cleaned_text = self._clean_text(text)
