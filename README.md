@@ -451,6 +451,5 @@ For support and questions:
 
 ---
 
-**Made with ❤️ using Django and OpenRoute AI**
 
 *Last updated: Version 1.0.0 - Automatic update system included*
