@@ -51,7 +51,7 @@ class AIBreakdownService:
                     "options": {
                         "temperature": 0.7,
                         "top_p": 0.9,
-                        "max_tokens": 4000
+                        "max_tokens": 8000  # Increased from 4000 to allow longer responses
                     }
                 }
                 
@@ -147,10 +147,15 @@ class AIBreakdownService:
         # Remove special characters that might confuse the AI
         text = re.sub(r'[^\w\s\.\,\;\:\!\?\-\(\)\[\]]', '', text)
         
-        # Limit text length to prevent token overflow
-        max_length = 8000
+        # Increase max length to handle longer documents
+        max_length = 32000  # Increased from 8000 to handle longer documents
         if len(text) > max_length:
-            text = text[:max_length] + "... [truncated]"
+            # Instead of truncating, try to keep the most important parts
+            # Keep the beginning and end, remove middle parts
+            first_part = text[:max_length//2]
+            last_part = text[-(max_length//2):]
+            text = first_part + "\n\n[Content continues...]\n\n" + last_part
+            print(f"Document was {len(text)} characters, truncated to {len(text)} characters")
         
         return text.strip()
     
@@ -166,52 +171,83 @@ class AIBreakdownService:
         """
         prompts = []
         
-        # Prompt 1: Structured breakdown
-        prompt1 = f"""You are a content breakdown assistant. Your task is to take a full document and break it down clearly step-by-step.
+        # Prompt 1: Comprehensive structured breakdown
+        prompt1 = f"""You are a content breakdown assistant. Your task is to take a full document and break it down completely into clear, detailed step-by-step instructions.
 
-Use numbered or bullet point format. Avoid AI tone. Keep it clear, short, and professional.
+IMPORTANT: Analyze the ENTIRE document content. Do not skip any sections or topics.
+
+Requirements:
+- Use clear, numbered sections (1., 2., 3., etc.)
+- Include ALL main topics and subtopics
+- Break down complex sections into subsections
+- Highlight key points, findings, and insights
+- Maintain professional tone
+- Be comprehensive - cover everything in the document
+- Use bullet points for detailed breakdowns within sections
 
 Example output format:
-1. Introduction: Describes the project background
-2. Methodology: Outlines data collection
-3. Results: Summarizes findings
-4. Conclusion: Provides final recommendations
+1. Project Overview
+   - Main purpose and scope
+   - Key objectives
+   - Target audience
 
-Now, analyze the following text and create a structured breakdown:
+2. Technical Architecture
+   - System components
+   - Technology stack
+   - Data flow
+
+3. Implementation Details
+   - Development approach
+   - Key features
+   - Technical specifications
+
+4. Results and Outcomes
+   - Achievements
+   - Performance metrics
+   - User feedback
+
+5. Conclusion and Recommendations
+   - Summary of findings
+   - Next steps
+   - Future improvements
+
+Now, analyze the following COMPLETE document and create a comprehensive, detailed breakdown:
 
 {text}
 
-Please provide a clear, structured breakdown with numbered sections:"""
+Please provide a complete, structured breakdown covering ALL content in the document:"""
 
-        # Prompt 2: Detailed analysis
-        prompt2 = f"""Analyze this document and create a comprehensive step-by-step breakdown.
+        # Prompt 2: Detailed analysis with subsections
+        prompt2 = f"""Create a comprehensive, detailed breakdown of this document.
 
 Requirements:
-- Use clear, numbered sections
-- Include main topics and subtopics
-- Highlight key points and findings
-- Maintain professional tone
-- Focus on actionable insights
+- Analyze the ENTIRE document content
+- Use numbered sections (1., 2., 3., etc.)
+- Include subsections with bullet points
+- Cover all topics, features, and details mentioned
+- Maintain logical flow and structure
+- Be thorough and complete
 
 Document content:
 {text}
 
-Create a detailed breakdown:"""
+Create a detailed, comprehensive breakdown covering everything:"""
 
-        # Prompt 3: Executive summary style
-        prompt3 = f"""Create an executive summary breakdown of this document.
+        # Prompt 3: Executive summary with full coverage
+        prompt3 = f"""Create a comprehensive breakdown of this document that covers ALL content.
 
 Format:
-1. Overview: Main purpose and scope
-2. Key Points: Important findings and insights
-3. Methodology: How the work was conducted
-4. Results: Main outcomes and conclusions
-5. Recommendations: Suggested next steps
+1. Executive Summary: Main purpose, scope, and key findings
+2. Detailed Analysis: Complete breakdown of all sections
+3. Technical Details: All technical aspects and specifications
+4. Implementation: All implementation details and approaches
+5. Results: All outcomes, metrics, and achievements
+6. Recommendations: All suggestions and next steps
 
 Document:
 {text}
 
-Provide an executive summary breakdown:"""
+Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
 
         prompts.extend([prompt1, prompt2, prompt3])
         return prompts
@@ -229,9 +265,9 @@ Provide an executive summary breakdown:"""
         # Try to extract numbered sections
         sections = []
         
-        # Look for numbered patterns (1., 2., etc.)
+        # Look for numbered patterns (1., 2., etc.) - more comprehensive pattern
         numbered_pattern = r'(\d+\.\s*[^\n]+(?:\n(?!\d+\.)[^\n]*)*)'
-        numbered_matches = re.findall(numbered_pattern, response, re.MULTILINE)
+        numbered_matches = re.findall(numbered_pattern, response, re.MULTILINE | re.DOTALL)
         
         if numbered_matches:
             for match in numbered_matches:
@@ -242,17 +278,41 @@ Provide an executive summary breakdown:"""
         # If no numbered sections, try bullet points
         if not sections:
             bullet_pattern = r'([•\-\*]\s*[^\n]+(?:\n(?![\•\-\*])[^\n]*)*)'
-            bullet_matches = re.findall(bullet_pattern, response, re.MULTILINE)
+            bullet_matches = re.findall(bullet_pattern, response, re.MULTILINE | re.DOTALL)
             
             for match in bullet_matches:
                 section_text = match.strip()
                 if len(section_text) > 10:
                     sections.append(section_text)
         
+        # If still no sections, split by paragraphs or lines that look like sections
+        if not sections:
+            # Look for lines that start with common section indicators
+            section_indicators = ['Overview', 'Introduction', 'Background', 'Methodology', 'Results', 'Conclusion', 'Summary', 'Analysis', 'Implementation', 'Features', 'Architecture', 'Design', 'Development', 'Testing', 'Deployment']
+            
+            lines = response.split('\n')
+            current_section = ""
+            
+            for line in lines:
+                line = line.strip()
+                if any(indicator.lower() in line.lower() for indicator in section_indicators) and len(line) > 5:
+                    if current_section:
+                        sections.append(current_section.strip())
+                    current_section = line
+                elif line and current_section:
+                    current_section += "\n" + line
+            
+            if current_section:
+                sections.append(current_section.strip())
+        
         # If still no sections, split by paragraphs
         if not sections:
             paragraphs = [p.strip() for p in response.split('\n\n') if p.strip() and len(p.strip()) > 20]
-            sections = paragraphs[:10]  # Limit to 10 sections
+            sections = paragraphs[:15]  # Increased limit to 15 sections
+        
+        # Ensure we have at least some content
+        if not sections:
+            sections = [response[:1000] + "..." if len(response) > 1000 else response]
         
         return {
             'sections': sections,
