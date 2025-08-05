@@ -37,15 +37,16 @@ def upload_document(request):
     if request.method == 'POST':
         if 'document' not in request.FILES:
             messages.error(request, 'Please select a file to upload.')
-            return redirect('home')
+            return redirect('breakdown:home')
         
         uploaded_file = request.FILES['document']
         
         # Validate file type
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-        if file_extension not in [ext.replace('.', '') for ext in settings.ALLOWED_FILE_TYPES]:
-            messages.error(request, f'File type {file_extension} is not supported.')
-            return redirect('home')
+        allowed_extensions = [ext.lower() for ext in settings.ALLOWED_FILE_TYPES]
+        if file_extension not in allowed_extensions:
+            messages.error(request, f'File type {file_extension} is not supported. Allowed types: {", ".join(allowed_extensions)}')
+            return redirect('breakdown:home')
         
         # Create document record
         document = Document.objects.create(
@@ -58,10 +59,17 @@ def upload_document(request):
         
         try:
             # Extract text from the document
+            print(f"Extracting text from {document.file.path}...")
             extracted_text = extract_text_from_file(document.file.path, document.file_type)
+            
+            if not extracted_text or len(extracted_text.strip()) < 10:
+                raise Exception("No text could be extracted from the document")
+            
             document.extracted_text = extracted_text
             document.status = 'completed'
             document.save()
+            
+            print(f"Text extracted successfully. Length: {len(extracted_text)} characters")
             
             # Generate AI breakdown
             ai_service = AIBreakdownService()
@@ -77,7 +85,7 @@ def upload_document(request):
                 )
                 
                 messages.success(request, 'Document uploaded and processed successfully!')
-                return redirect('breakdown_detail', breakdown_id=breakdown.id)
+                return redirect('breakdown:breakdown_detail', breakdown_id=breakdown.id)
             else:
                 document.status = 'failed'
                 document.save()
@@ -87,8 +95,9 @@ def upload_document(request):
             document.status = 'failed'
             document.save()
             messages.error(request, f'Error processing document: {str(e)}')
+            print(f"Error processing document: {str(e)}")
         
-        return redirect('home')
+        return redirect('breakdown:home')
     
     return render(request, 'breakdown/upload.html')
 
@@ -99,6 +108,17 @@ def breakdown_detail(request, breakdown_id):
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     return render(request, 'breakdown/breakdown_detail.html', {
+        'breakdown': breakdown,
+        'document': breakdown.document
+    })
+
+
+def breakdown_viewer(request, breakdown_id):
+    """
+    Display the full breakdown viewer with markers and comments.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    return render(request, 'breakdown/breakdown_viewer.html', {
         'breakdown': breakdown,
         'document': breakdown.document
     })
@@ -140,6 +160,128 @@ def regenerate_breakdown(request, breakdown_id):
         }, status=500)
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def custom_prompt(request, breakdown_id):
+    """
+    Handle custom AI prompts for breakdown improvement.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    
+    try:
+        data = json.loads(request.body)
+        prompt = data.get('prompt', '')
+        markers = data.get('markers', [])
+        comments = data.get('comments', {})
+        
+        if not prompt:
+            return JsonResponse({
+                'success': False,
+                'error': 'No prompt provided'
+            }, status=400)
+        
+        # Create enhanced prompt with user feedback
+        enhanced_prompt = f"""
+{prompt}
+
+Original Breakdown:
+{breakdown.raw_breakdown}
+
+User Markers:
+{json.dumps(markers, indent=2)}
+
+User Comments:
+{json.dumps(comments, indent=2)}
+
+Please review and improve the breakdown based on the user's feedback.
+"""
+        
+        # Send to AI
+        ai_service = AIBreakdownService()
+        breakdown_result = ai_service.breakdown_document(enhanced_prompt)
+        
+        if breakdown_result['success']:
+            # Create new breakdown or update existing
+            breakdown.content = breakdown_result['breakdown']
+            breakdown.raw_breakdown = breakdown_result['raw_response']
+            breakdown.ai_model_used = breakdown_result['model_used']
+            breakdown.save()
+            
+            return JsonResponse({
+                'success': True,
+                'breakdown': breakdown_result['breakdown'],
+                'message': 'Breakdown updated with custom prompt'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': breakdown_result['error']
+            }, status=400)
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def regenerate_with_comments(request, breakdown_id):
+    """
+    Regenerate the breakdown taking into account user comments and markers.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    
+    try:
+        data = json.loads(request.body)
+        comments = data.get('comments', '')
+        markers = data.get('markers', [])
+        
+        # Create enhanced prompt with comments
+        enhanced_prompt = f"""
+Please regenerate the following breakdown taking into account the user's comments and feedback:
+
+Original Breakdown:
+{breakdown.raw_breakdown}
+
+User Comments:
+{comments}
+
+User Markers:
+{json.dumps(markers, indent=2)}
+
+Please improve the breakdown based on the user's feedback while maintaining the original structure and content.
+"""
+        
+        # Send to AI
+        ai_service = AIBreakdownService()
+        breakdown_result = ai_service.breakdown_document(enhanced_prompt)
+        
+        if breakdown_result['success']:
+            breakdown.content = breakdown_result['breakdown']
+            breakdown.raw_breakdown = breakdown_result['raw_response']
+            breakdown.ai_model_used = breakdown_result['model_used']
+            breakdown.save()
+            
+            return JsonResponse({
+                'success': True,
+                'breakdown': breakdown_result['breakdown'],
+                'message': 'Breakdown regenerated with comments'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': breakdown_result['error']
+            }, status=400)
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
 def document_list(request):
     """
     Display a list of all uploaded documents.
@@ -163,7 +305,7 @@ def delete_document(request, document_id):
         
         document.delete()
         messages.success(request, 'Document deleted successfully.')
-        return redirect('document_list')
+        return redirect('breakdown:document_list')
     
     return render(request, 'breakdown/delete_confirm.html', {
         'document': document

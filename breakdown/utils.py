@@ -8,6 +8,9 @@ import os
 import PyPDF2
 from docx import Document as DocxDocument
 import logging
+import subprocess
+import tempfile
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,11 @@ def extract_text_from_file(file_path: str, file_type: str) -> str:
         Extracted text content
     """
     try:
+        print(f"Extracting text from {file_path} (type: {file_type})")
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
         if file_type.lower() == 'pdf':
             return extract_text_from_pdf(file_path)
         elif file_type.lower() == 'docx':
@@ -36,6 +44,7 @@ def extract_text_from_file(file_path: str, file_type: str) -> str:
             raise ValueError(f"Unsupported file type: {file_type}")
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}")
+        print(f"Error extracting text from {file_path}: {e}")
         raise
 
 
@@ -53,9 +62,21 @@ def extract_text_from_pdf(file_path: str) -> str:
     try:
         with open(file_path, 'rb') as file:
             pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-        return text.strip()
+            print(f"PDF has {len(pdf_reader.pages)} pages")
+            
+            for i, page in enumerate(pdf_reader.pages):
+                page_text = page.extract_text()
+                if page_text:
+                    text += f"\n--- Page {i+1} ---\n{page_text}\n"
+                else:
+                    print(f"Warning: No text extracted from page {i+1}")
+        
+        text = text.strip()
+        if not text:
+            raise Exception("No text could be extracted from PDF")
+        
+        print(f"Successfully extracted {len(text)} characters from PDF")
+        return text
     except Exception as e:
         logger.error(f"Error extracting text from PDF {file_path}: {e}")
         raise
@@ -74,9 +95,25 @@ def extract_text_from_docx(file_path: str) -> str:
     try:
         doc = DocxDocument(file_path)
         text = ""
+        
+        # Extract text from paragraphs
         for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        return text.strip()
+            if paragraph.text.strip():
+                text += paragraph.text + "\n"
+        
+        # Extract text from tables
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        text += cell.text + "\n"
+        
+        text = text.strip()
+        if not text:
+            raise Exception("No text could be extracted from DOCX")
+        
+        print(f"Successfully extracted {len(text)} characters from DOCX")
+        return text
     except Exception as e:
         logger.error(f"Error extracting text from DOCX {file_path}: {e}")
         raise
@@ -84,7 +121,7 @@ def extract_text_from_docx(file_path: str) -> str:
 
 def extract_text_from_doc(file_path: str) -> str:
     """
-    Extract text from a DOC file.
+    Extract text from a DOC file using LibreOffice conversion.
     
     Args:
         file_path: Path to the DOC file
@@ -92,39 +129,47 @@ def extract_text_from_doc(file_path: str) -> str:
     Returns:
         Extracted text content
     """
-    # For DOC files, we'll need to use a different approach
-    # This is a placeholder - you might want to use python-docx2txt or similar
     try:
-        # Try to convert DOC to DOCX first, then extract
-        # This is a simplified approach - you might want to use a more robust solution
-        import subprocess
-        import tempfile
+        # Create a temporary directory for conversion
+        temp_dir = tempfile.mkdtemp()
+        temp_docx = os.path.join(temp_dir, "converted.docx")
         
-        # Create a temporary file for the converted DOCX
-        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
-            tmp_docx_path = tmp_file.name
+        # Convert DOC to DOCX using LibreOffice
+        cmd = [
+            'libreoffice', '--headless', '--convert-to', 'docx',
+            '--outdir', temp_dir, file_path
+        ]
         
-        try:
-            # Use LibreOffice to convert DOC to DOCX
-            subprocess.run([
-                'libreoffice', '--headless', '--convert-to', 'docx',
-                '--outdir', os.path.dirname(tmp_docx_path),
-                file_path
-            ], check=True)
-            
-            # Extract text from the converted DOCX
-            text = extract_text_from_docx(tmp_docx_path)
-            
-        finally:
-            # Clean up temporary file
-            if os.path.exists(tmp_docx_path):
-                os.unlink(tmp_docx_path)
+        print(f"Converting DOC to DOCX using command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode != 0:
+            raise Exception(f"LibreOffice conversion failed: {result.stderr}")
+        
+        # Check if conversion was successful
+        if not os.path.exists(temp_docx):
+            # Try to find the converted file with a different name
+            converted_files = [f for f in os.listdir(temp_dir) if f.endswith('.docx')]
+            if converted_files:
+                temp_docx = os.path.join(temp_dir, converted_files[0])
+            else:
+                raise Exception("DOC to DOCX conversion failed - no output file found")
+        
+        # Extract text from the converted DOCX
+        text = extract_text_from_docx(temp_docx)
+        
+        # Clean up temporary files
+        shutil.rmtree(temp_dir, ignore_errors=True)
         
         return text
+    except subprocess.TimeoutExpired:
+        raise Exception("DOC conversion timed out")
     except Exception as e:
         logger.error(f"Error extracting text from DOC {file_path}: {e}")
-        # Fallback: return a message about DOC conversion
-        return f"[DOC file detected - conversion failed: {str(e)}]"
+        # Clean up temporary files
+        if 'temp_dir' in locals():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
 
 
 def extract_text_from_txt(file_path: str) -> str:
@@ -138,16 +183,20 @@ def extract_text_from_txt(file_path: str) -> str:
         Extracted text content
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return file.read().strip()
-    except UnicodeDecodeError:
-        # Try with different encoding
-        try:
-            with open(file_path, 'r', encoding='latin-1') as file:
-                return file.read().strip()
-        except Exception as e:
-            logger.error(f"Error extracting text from TXT {file_path}: {e}")
-            raise
+        # Try different encodings
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as file:
+                    text = file.read()
+                    if text.strip():
+                        print(f"Successfully extracted {len(text)} characters from TXT using {encoding} encoding")
+                        return text.strip()
+            except UnicodeDecodeError:
+                continue
+        
+        raise Exception("Could not decode TXT file with any supported encoding")
     except Exception as e:
         logger.error(f"Error extracting text from TXT {file_path}: {e}")
         raise

@@ -1,0 +1,579 @@
+{% extends 'base.html' %}
+
+{% block title %}Breakdown Viewer - {{ breakdown.document.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.breakdown-section {
+    border-left: 3px solid #007bff;
+    padding-left: 15px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.breakdown-section:hover {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+.section-marker {
+    position: absolute;
+    left: -10px;
+    top: 5px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.section-marker:hover {
+    background: #0056b3;
+}
+
+.comment-box {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+    position: relative;
+}
+
+.comment-box .comment-header {
+    font-weight: bold;
+    color: #856404;
+    margin-bottom: 5px;
+}
+
+.comment-input {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 5px 0;
+}
+
+.prompt-builder {
+    background: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.prompt-preview {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+.section-content {
+    line-height: 1.6;
+}
+
+.highlighted {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.marker-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.marker-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+.marker-item:hover {
+    background: #e9ecef;
+}
+
+.marker-item.active {
+    background: #007bff;
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-eye"></i> Breakdown Viewer: {{ breakdown.document.title }}
+                    </h5>
+                    <div>
+                        <button class="btn btn-light btn-sm" onclick="toggleMarkers()">
+                            <i class="fas fa-map-marker-alt"></i> Toggle Markers
+                        </button>
+                        <a href="{% url 'breakdown:breakdown_detail' breakdown.id %}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Document Info -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6>Document Information</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Title:</strong> {{ breakdown.document.title }}</li>
+                                <li><strong>Type:</strong> {{ breakdown.document.file_type|upper }}</li>
+                                <li><strong>Uploaded:</strong> {{ breakdown.document.uploaded_at|date:"M d, Y H:i" }}</li>
+                                <li><strong>AI Model:</strong> {{ breakdown.ai_model_used }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Breakdown Stats</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Sections:</strong> {{ breakdown.content.sections|length }}</li>
+                                <li><strong>Created:</strong> {{ breakdown.created_at|date:"M d, Y H:i" }}</li>
+                                <li><strong>Status:</strong> <span class="badge bg-success">{{ breakdown.status }}</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Full Breakdown Content -->
+                    <div id="breakdown-content">
+                        <h5><i class="fas fa-list-ul"></i> Full Breakdown</h5>
+                        {% if breakdown.content.sections %}
+                            {% for section in breakdown.content.sections %}
+                                <div class="breakdown-section" id="section-{{ forloop.counter }}">
+                                    <div class="section-marker" onclick="addMarker({{ forloop.counter }}, '{{ section|truncatewords:10|escapejs }}')">
+                                        {{ forloop.counter }}
+                                    </div>
+                                    <div class="section-content">
+                                        <h6 class="text-primary">Section {{ forloop.counter }}</h6>
+                                        <div class="section-text">{{ section|linebreaks }}</div>
+                                        
+                                        <!-- Comment Section -->
+                                        <div class="comment-section mt-3" id="comment-section-{{ forloop.counter }}" style="display: none;">
+                                            <div class="comment-box">
+                                                <div class="comment-header">
+                                                    <i class="fas fa-comment"></i> Comments for Section {{ forloop.counter }}
+                                                </div>
+                                                <textarea class="comment-input" id="comment-{{ forloop.counter }}" 
+                                                          placeholder="Add your comments or suggestions for this section..."></textarea>
+                                                <button class="btn btn-sm btn-primary" onclick="saveComment({{ forloop.counter }})">
+                                                    <i class="fas fa-save"></i> Save Comment
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No structured breakdown content available.
+                                <div class="mt-2">
+                                    <strong>Raw Breakdown:</strong>
+                                    <pre class="bg-light p-3 rounded mt-2">{{ breakdown.raw_breakdown }}</pre>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Markers Panel -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-map-marker-alt"></i> Markers & Comments
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="markers-list" class="marker-list">
+                        <p class="text-muted">No markers added yet. Click on section numbers to add markers.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Prompt Builder -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">
+                        <i class="fas fa-magic"></i> Custom AI Prompt Builder
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="prompt-builder">
+                        <div class="mb-3">
+                            <label for="prompt-type" class="form-label">Prompt Type</label>
+                            <select class="form-select" id="prompt-type" onchange="updatePromptTemplate()">
+                                <option value="review">Review & Improve</option>
+                                <option value="expand">Expand Section</option>
+                                <option value="simplify">Simplify Content</option>
+                                <option value="custom">Custom Prompt</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="custom-prompt" class="form-label">Custom Prompt</label>
+                            <textarea class="form-control" id="custom-prompt" rows="4" 
+                                      placeholder="Enter your custom prompt for the AI..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Prompt Preview</label>
+                            <div id="prompt-preview" class="prompt-preview"></div>
+                        </div>
+                        
+                        <button class="btn btn-warning w-100" onclick="sendCustomPrompt()">
+                            <i class="fas fa-paper-plane"></i> Send to AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Panel -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs"></i> Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="exportBreakdown()">
+                            <i class="fas fa-download"></i> Export Breakdown
+                        </button>
+                        <button class="btn btn-outline-success" onclick="saveChanges()">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                        <button class="btn btn-outline-info" onclick="regenerateWithComments()">
+                            <i class="fas fa-sync-alt"></i> Regenerate with Comments
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Prompt Modal -->
+<div class="modal fade" id="customPromptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Custom AI Prompt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="modal-prompt" class="form-label">Your Custom Prompt</label>
+                    <textarea class="form-control" id="modal-prompt" rows="6" 
+                              placeholder="Enter your custom prompt for the AI to review and improve this breakdown..."></textarea>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Tip:</strong> You can reference specific sections by number (e.g., "Section 3 needs more detail") 
+                    or ask for general improvements to the entire breakdown.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitCustomPrompt()">
+                    <i class="fas fa-paper-plane"></i> Send to AI
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let markers = [];
+let comments = {};
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    loadMarkers();
+    loadComments();
+    updatePromptTemplate();
+});
+
+function toggleMarkers() {
+    const markers = document.querySelectorAll('.section-marker');
+    markers.forEach(marker => {
+        marker.style.display = marker.style.display === 'none' ? 'flex' : 'none';
+    });
+}
+
+function addMarker(sectionNumber, sectionText) {
+    const marker = {
+        id: Date.now(),
+        section: sectionNumber,
+        text: sectionText,
+        timestamp: new Date().toLocaleString()
+    };
+    
+    markers.push(marker);
+    saveMarkers();
+    updateMarkersList();
+    
+    // Show comment section
+    const commentSection = document.getElementById(`comment-section-${sectionNumber}`);
+    if (commentSection) {
+        commentSection.style.display = 'block';
+    }
+    
+    // Highlight the section
+    const section = document.getElementById(`section-${sectionNumber}`);
+    if (section) {
+        section.classList.add('highlighted');
+        setTimeout(() => section.classList.remove('highlighted'), 2000);
+    }
+}
+
+function saveComment(sectionNumber) {
+    const commentText = document.getElementById(`comment-${sectionNumber}`).value;
+    if (commentText.trim()) {
+        comments[sectionNumber] = {
+            text: commentText,
+            timestamp: new Date().toLocaleString()
+        };
+        saveComments();
+        alert('Comment saved successfully!');
+    }
+}
+
+function updateMarkersList() {
+    const markersList = document.getElementById('markers-list');
+    if (markers.length === 0) {
+        markersList.innerHTML = '<p class="text-muted">No markers added yet. Click on section numbers to add markers.</p>';
+        return;
+    }
+    
+    markersList.innerHTML = markers.map(marker => `
+        <div class="marker-item" onclick="scrollToSection(${marker.section})">
+            <strong>Section ${marker.section}</strong><br>
+            <small class="text-muted">${marker.text}</small><br>
+            <small class="text-muted">${marker.timestamp}</small>
+        </div>
+    `).join('');
+}
+
+function scrollToSection(sectionNumber) {
+    const section = document.getElementById(`section-${sectionNumber}`);
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth' });
+        section.classList.add('highlighted');
+        setTimeout(() => section.classList.remove('highlighted'), 3000);
+    }
+}
+
+function updatePromptTemplate() {
+    const promptType = document.getElementById('prompt-type').value;
+    const customPrompt = document.getElementById('custom-prompt');
+    const preview = document.getElementById('prompt-preview');
+    
+    let template = '';
+    switch (promptType) {
+        case 'review':
+            template = `Please review and improve the following breakdown. Focus on:
+- Clarity and readability
+- Logical flow and structure
+- Completeness of information
+- Professional tone
+
+Breakdown to review:
+{{BREAKDOWN_CONTENT}}
+
+User comments:
+{{USER_COMMENTS}}`;
+            break;
+        case 'expand':
+            template = `Please expand the following section with more detail and examples:
+
+Section to expand:
+{{SECTION_CONTENT}}
+
+User comments:
+{{USER_COMMENTS}}
+
+Please provide a more detailed and comprehensive version.`;
+            break;
+        case 'simplify':
+            template = `Please simplify the following content while maintaining all important information:
+
+Content to simplify:
+{{SECTION_CONTENT}}
+
+User comments:
+{{USER_COMMENTS}}
+
+Please make it more concise and easier to understand.`;
+            break;
+        case 'custom':
+            template = customPrompt.value || 'Enter your custom prompt here...';
+            break;
+    }
+    
+    customPrompt.value = template;
+    preview.textContent = template;
+}
+
+function sendCustomPrompt() {
+    const prompt = document.getElementById('custom-prompt').value;
+    if (!prompt.trim()) {
+        alert('Please enter a custom prompt.');
+        return;
+    }
+    
+    // Show modal for confirmation
+    document.getElementById('modal-prompt').value = prompt;
+    new bootstrap.Modal(document.getElementById('customPromptModal')).show();
+}
+
+function submitCustomPrompt() {
+    const prompt = document.getElementById('modal-prompt').value;
+    if (!prompt.trim()) {
+        alert('Please enter a custom prompt.');
+        return;
+    }
+    
+    // Send to AI for processing
+    fetch(`{% url 'breakdown:custom_prompt' breakdown.id %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            markers: markers,
+            comments: comments
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Custom prompt sent successfully! The AI will process your request.');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while sending the custom prompt.');
+    });
+}
+
+function exportBreakdown() {
+    const breakdownData = {
+        title: '{{ breakdown.document.title }}',
+        sections: {{ breakdown.content.sections|safe }},
+        markers: markers,
+        comments: comments,
+        exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(breakdownData, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `breakdown-${Date.now()}.json`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function saveChanges() {
+    saveMarkers();
+    saveComments();
+    alert('Changes saved successfully!');
+}
+
+function regenerateWithComments() {
+    if (confirm('This will regenerate the breakdown taking into account your comments and markers. Continue?')) {
+        const commentsText = Object.entries(comments).map(([section, comment]) => 
+            `Section ${section}: ${comment.text}`
+        ).join('\n');
+        
+        fetch(`{% url 'breakdown:regenerate_with_comments' breakdown.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                comments: commentsText,
+                markers: markers
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Breakdown regenerated successfully with your comments!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while regenerating the breakdown.');
+        });
+    }
+}
+
+// Local storage functions
+function saveMarkers() {
+    localStorage.setItem(`markers-${breakdown.id}`, JSON.stringify(markers));
+}
+
+function loadMarkers() {
+    const saved = localStorage.getItem(`markers-${breakdown.id}`);
+    if (saved) {
+        markers = JSON.parse(saved);
+        updateMarkersList();
+    }
+}
+
+function saveComments() {
+    localStorage.setItem(`comments-${breakdown.id}`, JSON.stringify(comments));
+}
+
+function loadComments() {
+    const saved = localStorage.getItem(`comments-${breakdown.id}`);
+    if (saved) {
+        comments = JSON.parse(saved);
+        // Load comments into textareas
+        Object.entries(comments).forEach(([section, comment]) => {
+            const textarea = document.getElementById(`comment-${section}`);
+            if (textarea) {
+                textarea.value = comment.text;
+                document.getElementById(`comment-section-${section}`).style.display = 'block';
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 

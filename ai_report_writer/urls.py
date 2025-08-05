@@ -25,6 +25,7 @@ urlpatterns = [
     path('review/', include('user_review.urls')),
     path('breakdown-review/', include('breakdown_review.urls')),
     path('creation/', include('creation.urls')),
+    path('comparison/', include('comparison_ai.urls')),
 ]
 
 # Serve media files during development

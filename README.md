@@ -68,18 +68,33 @@ AI Report Writer is a modular platform that:
    ./setup.sh
    ```
 
-3. **Start the services**
-   ```bash
-   # Start LM Studio
-   ./scripts/start_llmstudio.sh
-   
-   # Start Django (in another terminal)
-   ./scripts/start_django.sh
-   ```
+3. **Automatic Startup Features**
+   The setup script now automatically:
+   - ✅ Starts LM Studio (if not already running)
+   - ✅ Starts Django server
+   - ✅ Applies any updates
+   - ✅ Runs health checks
+   - ✅ Displays status dashboard
 
 4. **Access the application**
    - Open: http://127.0.0.1:8000
    - Admin: http://127.0.0.1:8000/admin (admin/admin123)
+   - LM Studio API: http://192.168.0.34:1234
+
+### Manual Startup (if needed)
+
+If you need to start services manually:
+
+```bash
+# Start LM Studio
+./scripts/start_llmstudio.sh
+
+# Start Django (in another terminal)
+./scripts/start_django.sh
+
+# Check status
+./scripts/status.sh
+```
 
 ## 🔄 Automatic Updates
 
@@ -143,8 +158,11 @@ ai_report_writer/
 │   ├── start_llmstudio.sh   # LM Studio startup
 │   ├── start_django.sh      # Django startup
 │   ├── check_status.sh      # System health check
+│   ├── status.sh            # Quick status dashboard
 │   ├── backup.sh            # Backup system
-│   └── update.sh            # Automatic updates
+│   ├── update.sh            # Automatic updates
+│   ├── test_lmstudio.sh     # LM Studio connection test
+│   └── generate_secret_key.py # Secure key generator
 ├── Studio/                   # LM Studio AppImage
 ├── assets/                   # Local AI assets
 ├── java_assets/             # Java files for DOCX/PDF generation

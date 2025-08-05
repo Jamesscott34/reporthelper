@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-(%fi@)nl#+9o-)^mwc@265jp=8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,0.0.0.0').split(',')
 
 # Security settings for production
 if not DEBUG:
@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'user_review',
     'breakdown_review',
     'creation',
+    'comparison_ai',
 ]
 
 MIDDLEWARE = [

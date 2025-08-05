@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# AI Report Writer - Django Development Server
-# Handles native Django development environment with automatic setup and updates
+# AI Report Writer - Complete Startup & Setup Script
+# Handles everything automatically with constant updates and comprehensive setup
 
 set -e  # Exit on any error
 
-echo "🚀 AI Report Writer - Django Development Server"
-echo "=============================================="
+echo "🚀 AI Report Writer - Complete Startup & Setup System"
+echo "===================================================="
 
 # Color codes for output
 RED='\033[0;31m'
@@ -46,13 +46,42 @@ check_python() {
     print_success "Python 3 found: $(python3 --version)"
 }
 
+# Function to check system requirements
+check_system_requirements() {
+    print_status "Checking system requirements..."
+    
+    # Check Python version
+    PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    REQUIRED_VERSION="3.8"
+    
+    if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" = "$REQUIRED_VERSION" ]; then
+        print_success "Python version $PYTHON_VERSION is compatible"
+    else
+        print_error "Python version $PYTHON_VERSION is too old. Required: $REQUIRED_VERSION+"
+        exit 1
+    fi
+    
+    # Check for required system tools
+    tools=("curl" "git" "libreoffice")
+    for tool in "${tools[@]}"; do
+        if command -v "$tool" &> /dev/null; then
+            print_success "$tool: Available"
+        else
+            print_warning "$tool: Not found (may not be installed)"
+        fi
+    done
+}
+
 # Function to create virtual environment if needed
 create_venv() {
     print_status "Checking virtual environment..."
     
     if [ ! -d "venv" ]; then
         print_status "Creating virtual environment..."
-        python3 -m venv venv
+        python3 -m venv venv || {
+            print_error "Failed to create virtual environment"
+            return 1
+        }
         print_success "Virtual environment created"
     else
         print_success "Virtual environment found"
@@ -64,23 +93,32 @@ install_dependencies() {
     print_status "Checking Python dependencies..."
     
     # Activate virtual environment
-    source venv/bin/activate
+    source venv/bin/activate || {
+        print_error "Failed to activate virtual environment"
+        return 1
+    }
     
     # Check if key packages are installed
     if ! python -c "import django" 2>/dev/null; then
         print_status "Installing Python dependencies..."
         
         # Upgrade pip
-        pip install --upgrade pip
+        pip install --upgrade pip || echo -e "${YELLOW}⚠️  Failed to upgrade pip${NC}"
         
-        # Install requirements
+        # Install core dependencies first
+        pip install django python-docx PyPDF2 requests python-dotenv || {
+            print_error "Failed to install core dependencies"
+            return 1
+        }
+        
+        # Install requirements if file exists
         if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-            print_success "Python dependencies installed"
-        else
-            print_error "requirements.txt not found"
-            exit 1
+            pip install -r requirements.txt || {
+                print_warning "Some requirements failed to install"
+            }
         fi
+        
+        print_success "Python dependencies installed"
     else
         print_success "Python dependencies already installed"
     fi
@@ -96,7 +134,7 @@ create_env_file() {
 # Django Configuration
 DEBUG=True
 SECRET_KEY=django-insecure-development-key-change-in-production
-ALLOWED_HOSTS=localhost,127.0.0.1
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 
 # AI Configuration (LM Studio)
 OLLAMA_HOST=http://192.168.0.34:1234
@@ -129,25 +167,9 @@ create_directories() {
     mkdir -p java_assets
     mkdir -p prompts
     mkdir -p backups
+    mkdir -p Studio
     
     print_success "Project directories created"
-}
-
-# Function to check if virtual environment exists
-check_venv() {
-    if [ ! -d "venv" ]; then
-        print_error "Virtual environment not found."
-        echo ""
-        echo "To create the virtual environment:"
-        echo "1. Run setup script: ./setup.sh"
-        echo "   OR manually:"
-        echo "2. python3 -m venv venv"
-        echo "3. source venv/bin/activate"
-        echo "4. pip install -r requirements.txt"
-        echo ""
-        exit 1
-    fi
-    print_success "Virtual environment found"
 }
 
 # Function to activate virtual environment
@@ -170,21 +192,6 @@ check_python_packages() {
         else
             print_error "$package: Not installed"
             print_status "Please run: pip install $package"
-        fi
-    done
-}
-
-# Function to check system tools
-check_system_tools() {
-    print_status "Checking system tools..."
-    
-    tools=("curl" "git" "libreoffice")
-    
-    for tool in "${tools[@]}"; do
-        if command -v "$tool" &> /dev/null; then
-            print_success "$tool: Available"
-        else
-            print_warning "$tool: Not found (may not be installed)"
         fi
     done
 }
@@ -232,11 +239,13 @@ apply_updates() {
     print_status "Applying updates..."
     
     # Update dependencies
-    pip install --upgrade -r requirements.txt
+    pip install --upgrade -r requirements.txt || {
+        print_warning "Some dependencies failed to update"
+    }
     
     # Run migrations
     python manage.py makemigrations --noinput || true
-    python manage.py migrate --noinput
+    python manage.py migrate --noinput || true
     
     # Collect static files
     python manage.py collectstatic --noinput || true
@@ -282,33 +291,104 @@ create_superuser() {
     fi
 }
 
+# Function to make scripts executable
+make_scripts_executable() {
+    print_status "Making scripts executable..."
+    
+    # Make all scripts executable
+    chmod +x scripts/*.sh 2>/dev/null || true
+    chmod +x *.sh 2>/dev/null || true
+    
+    print_success "Scripts made executable"
+}
+
 # Function to start LM Studio if available
 start_lm_studio() {
     print_status "Checking LM Studio..."
     
-    # Check if LM Studio is running
-    if pgrep -f "LM-Studio" > /dev/null; then
-        print_success "LM Studio is already running"
-    else
-        print_status "Starting LM Studio..."
-        
-        # Check if AppImage exists
-        if [ -f "Studio/LM-Studio-0.3.20-4-x64.AppImage" ]; then
-            chmod +x Studio/LM-Studio-0.3.20-4-x64.AppImage
-            nohup Studio/LM-Studio-0.3.20-4-x64.AppImage > /dev/null 2>&1 &
-            sleep 10
-            print_success "LM Studio started"
-        else
-            print_warning "LM Studio AppImage not found"
-        fi
+    # Check if LM Studio API is responding
+    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+        print_success "LM Studio API is responding"
+        return 0
     fi
     
-    # Check API endpoint
-    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
-        print_success "LM Studio API responding"
-    else
-        print_warning "LM Studio API not responding"
+    # Check if LM Studio process is running (multiple possible names)
+    if pgrep -f "lm-studio" > /dev/null || pgrep -f "LM-Studio" > /dev/null || pgrep -f "lmstudio" > /dev/null; then
+        print_warning "LM Studio process found but API not responding"
+        print_status "Waiting for LM Studio to start up..."
+        
+        # Wait up to 30 seconds for LM Studio to start
+        for i in {1..30}; do
+            if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+                print_success "LM Studio API is now responding"
+                return 0
+            fi
+            sleep 1
+        done
+        
+        print_warning "LM Studio process found but API still not responding after 30 seconds"
     fi
+    
+    # LM Studio is not running, try to start it
+    print_status "Starting LM Studio..."
+    
+    # Check if AppImage exists
+    if [ -f "Studio/LM-Studio-0.3.20-4-x64.AppImage" ]; then
+        chmod +x Studio/LM-Studio-0.3.20-4-x64.AppImage
+        print_status "Starting LM Studio AppImage..."
+        nohup Studio/LM-Studio-0.3.20-4-x64.AppImage > /dev/null 2>&1 &
+        LM_STUDIO_PID=$!
+        
+        # Wait for LM Studio to start
+        print_status "Waiting for LM Studio to start up..."
+        for i in {1..60}; do
+            if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+                print_success "LM Studio started successfully (PID: $LM_STUDIO_PID)"
+                return 0
+            fi
+            sleep 1
+        done
+        
+        print_warning "LM Studio started but API not responding after 60 seconds"
+    else
+        print_warning "LM Studio AppImage not found at Studio/LM-Studio-0.3.20-4-x64.AppImage"
+        print_status "Please ensure LM Studio is installed and running manually"
+    fi
+    
+    # Final check
+    if curl -s http://192.168.0.34:1234/api/tags > /dev/null 2>&1; then
+        print_success "LM Studio API is responding"
+    else
+        print_warning "LM Studio API not responding - you may need to start it manually"
+    fi
+}
+
+# Function to run health checks
+run_health_checks() {
+    print_status "Running health checks..."
+    
+    # Check database connection
+    if python manage.py check --database default > /dev/null 2>&1; then
+        print_success "Database connection: OK"
+    else
+        print_warning "Database connection: Issues detected"
+    fi
+    
+    # Check Django settings
+    if python manage.py check > /dev/null 2>&1; then
+        print_success "Django settings: OK"
+    else
+        print_warning "Django settings: Issues detected"
+    fi
+    
+    # Check static files
+    if [ -d "staticfiles" ]; then
+        print_success "Static files: OK"
+    else
+        print_warning "Static files: Not collected"
+    fi
+    
+    print_success "Health checks completed"
 }
 
 # Function to start Django development server
@@ -373,6 +453,9 @@ main() {
     # Check Python
     check_python
     
+    # Check system requirements
+    check_system_requirements
+    
     # Create virtual environment if needed
     create_venv
     
@@ -391,11 +474,11 @@ main() {
     # Check Python packages
     check_python_packages
     
-    # Check system tools
-    check_system_tools
-    
     # Setup environment
     setup_environment
+    
+    # Make scripts executable
+    make_scripts_executable
     
     # Check for updates
     if check_for_updates; then
@@ -410,6 +493,9 @@ main() {
     
     # Create superuser if needed
     create_superuser
+    
+    # Run health checks
+    run_health_checks
     
     # Start LM Studio if available
     start_lm_studio
@@ -450,10 +536,18 @@ case "${1:-}" in
     "setup")
         print_status "Running setup only..."
         check_python
+        check_system_requirements
         create_venv
         install_dependencies
         create_env_file
         create_directories
+        activate_venv
+        make_scripts_executable
+        setup_environment
+        run_migrations
+        collect_static
+        create_superuser
+        run_health_checks
         print_success "Setup completed"
         ;;
     "update")
@@ -471,7 +565,7 @@ case "${1:-}" in
         echo "Usage: $0 [command]"
         echo ""
         echo "Commands:"
-        echo "  (no args)  - Start Django development server"
+        echo "  (no args)  - Start Django development server with full setup"
         echo "  setup      - Run setup only (create venv, install deps)"
         echo "  migrate    - Run Django migrations only"
         echo "  test       - Run tests"
