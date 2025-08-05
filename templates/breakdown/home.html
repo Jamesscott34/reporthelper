@@ -24,7 +24,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="post" enctype="multipart/form-data" action="{% url 'breakdown:upload_document' %}">
+                <form method="post" enctype="multipart/form-data" action="{% url 'breakdown:upload' %}">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="document" class="form-label">Select Document</label>
