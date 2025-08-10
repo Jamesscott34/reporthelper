@@ -16,6 +16,9 @@
             padding: 1rem;
             background: #f8f9fa;
         }
+        .chat-container.expanded {
+            height: 75vh;
+        }
         
         .message {
             margin-bottom: 1rem;
@@ -96,8 +99,22 @@
                         <h6 class="mb-0"><i class="fas fa-file-text"></i> Selected Content from: <span id="section-name">Loading...</span></h6>
                     </div>
                     <div class="card-body">
+                        <div class="d-flex justify-content-end mb-2 gap-2">
+                            <button class="btn btn-sm btn-outline-primary" id="btn-edit-content" onclick="toggleContentEdit(true)">
+                                <i class="fas fa-edit"></i> Edit Content
+                            </button>
+                            <button class="btn btn-sm btn-success d-none" id="btn-save-content" onclick="saveEditedContent()">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button class="btn btn-sm btn-secondary d-none" id="btn-cancel-content" onclick="toggleContentEdit(false,true)">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
                         <div class="content-preview" id="content-preview">
                             <p class="text-muted">Loading content...</p>
+                        </div>
+                        <div class="d-none" id="content-editor">
+                            <textarea class="form-control" id="editable-content" rows="10" placeholder="Edit selected content here..."></textarea>
                         </div>
                         <div class="mt-2">
                             <small class="text-muted">
@@ -124,6 +141,7 @@
                                         <option value="summarize">Summarize</option>
                                         <option value="analyze">Analyze & Critique</option>
                                         <option value="suggest">Suggest Improvements</option>
+                                        <option value="detailed-steps">Detailed Step-by-Step (links & commands)</option>
                                         <option value="custom">Custom</option>
                                     </select>
                                 </div>
@@ -150,8 +168,19 @@
                 
                 <!-- AI Response and Chat -->
                 <div class="card">
-                    <div class="card-header bg-success text-white">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="fas fa-robot"></i> AI Response & Chat</h6>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light btn-sm" onclick="toggleChatExpand()">
+                                <i class="fas fa-up-down-left-right"></i> Expand
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" onclick="copyAllChat()">
+                                <i class="fas fa-copy"></i> Copy All
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" onclick="downloadChatTxt()">
+                                <i class="fas fa-download"></i> Download .txt
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="chat-container" id="chat-container">
@@ -183,30 +212,36 @@
         const content = urlParams.get('content');
         const section = urlParams.get('section');
         const prompt = urlParams.get('prompt');
+        const promptTypeOverride = urlParams.get('promptType');
+        let decodedContentGlobal = null;
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Content:', content);
-            console.log('Section:', section);
-            console.log('Prompt:', prompt);
+            // Debug logs removed for production
             
             if (content && section) {
                 document.getElementById('section-name').textContent = decodeURIComponent(section);
                 // Decode the content and handle line breaks properly
                 const decodedContent = decodeURIComponent(content);
+                decodedContentGlobal = decodedContent;
                 document.getElementById('content-preview').innerHTML = decodedContent.replace(/\n/g, '<br>');
                 document.getElementById('content-status').textContent = `Loaded ${decodedContent.length} characters`;
-                console.log('Decoded content:', decodedContent);
+                // Debug log removed
             } else {
                 document.getElementById('content-status').textContent = 'No content provided';
             }
             
+            // Pre-select prompt type if provided
+            if (promptTypeOverride) {
+                document.getElementById('prompt-type').value = promptTypeOverride;
+            }
+
             // Pre-fill custom prompt if provided
             if (prompt) {
                 const decodedPrompt = decodeURIComponent(prompt);
                 document.getElementById('custom-prompt').value = decodedPrompt;
                 document.getElementById('prompt-type').value = 'custom';
-                console.log('Decoded prompt:', decodedPrompt);
+                // Debug log removed
             }
             
             // Set up prompt type change handler
@@ -230,7 +265,8 @@
                     'explain': 'Please explain and clarify the following content:',
                     'summarize': 'Please provide a concise summary of the following content:',
                     'analyze': 'Please analyze and critique the following content:',
-                    'suggest': 'Please suggest improvements for the following content:'
+                    'suggest': 'Please suggest improvements for the following content:',
+                    'detailed-steps': 'Create a comprehensive, beginner-friendly, step-by-step guide that expands the content into actionable instructions with: 1) direct download links (official sources), 2) exact commands for Windows PowerShell and Linux/macOS (where applicable), 3) configuration file snippets, 4) verification checks, and 5) common troubleshooting tips. Use clear headings, numbered steps, substeps, and include WHY each step matters. Where possible, include both GUI and CLI paths. Format code blocks with proper fencing and label the shell (powershell, bash). If the content requests a report or a word count (e.g., 600 words), generate a fluent, no-fluff report instead, with numbered sections and image placeholders (e.g., "Figure 1.1: …"). Minimum 500 words unless a higher count is specified.'
                 };
                 preview = typePrompts[promptType] + ' ' + customPrompt;
             }
@@ -238,6 +274,116 @@
             document.getElementById('prompt-preview').value = preview;
         }
         
+        function toggleContentEdit(enable, isCancel = false) {
+            const preview = document.getElementById('content-preview');
+            const editorWrap = document.getElementById('content-editor');
+            const textarea = document.getElementById('editable-content');
+            const btnEdit = document.getElementById('btn-edit-content');
+            const btnSave = document.getElementById('btn-save-content');
+            const btnCancel = document.getElementById('btn-cancel-content');
+
+            if (enable) {
+                // Move current preview text (plain) into textarea
+                const plainText = preview.textContent || '';
+                textarea.value = plainText.trim();
+                preview.classList.add('d-none');
+                editorWrap.classList.remove('d-none');
+                btnEdit.classList.add('d-none');
+                btnSave.classList.remove('d-none');
+                btnCancel.classList.remove('d-none');
+            } else {
+                if (isCancel) {
+                    // Restore preview, discard edits
+                    editorWrap.classList.add('d-none');
+                    preview.classList.remove('d-none');
+                }
+                btnEdit.classList.remove('d-none');
+                btnSave.classList.add('d-none');
+                btnCancel.classList.add('d-none');
+            }
+        }
+
+        function toggleChatExpand() {
+            const chat = document.getElementById('chat-container');
+            if (!chat) return;
+            if (chat.classList.contains('expanded')) {
+                chat.classList.remove('expanded');
+            } else {
+                chat.classList.add('expanded');
+            }
+        }
+
+        function getAllChatText() {
+            const chat = document.getElementById('chat-container');
+            if (!chat) return '';
+            // Use innerText to keep line breaks readable
+            return chat.innerText || '';
+        }
+
+        function copyAllChat() {
+            const text = getAllChatText();
+            if (!text) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    addMessage('ai', 'Copied all chat content to clipboard.');
+                }).catch(() => {
+                    // Fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    addMessage('ai', 'Copied all chat content to clipboard.');
+                });
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                addMessage('ai', 'Copied all chat content to clipboard.');
+            }
+        }
+
+        function downloadChatTxt() {
+            const text = getAllChatText();
+            if (!text) return;
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const ts = now.toISOString().replace(/[:.]/g, '-');
+            a.download = `custom_ai_output_${ts}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function saveEditedContent() {
+            const preview = document.getElementById('content-preview');
+            const editorWrap = document.getElementById('content-editor');
+            const textarea = document.getElementById('editable-content');
+            const btnEdit = document.getElementById('btn-edit-content');
+            const btnSave = document.getElementById('btn-save-content');
+            const btnCancel = document.getElementById('btn-cancel-content');
+
+            const newText = textarea.value || '';
+            decodedContentGlobal = newText;
+            preview.innerHTML = (newText || '').replace(/\n/g, '<br>');
+            document.getElementById('content-status').textContent = `Loaded ${newText.length} characters`;
+
+            editorWrap.classList.add('d-none');
+            preview.classList.remove('d-none');
+            btnEdit.classList.remove('d-none');
+            btnSave.classList.add('d-none');
+            btnCancel.classList.add('d-none');
+            showToast && showToast('Content updated');
+        }
+
         function sendToAI() {
             const prompt = document.getElementById('prompt-preview').value;
             if (!prompt.trim()) {
@@ -250,16 +396,28 @@
             
             // Show AI is thinking
             const thinkingId = addMessage('ai', '🤔 Thinking...');
-            
-            // Simulate AI response (replace with actual API call)
-            setTimeout(() => {
-                // Remove thinking message
-                document.getElementById(thinkingId).remove();
-                
-                // Add AI response
-                const response = generateAIResponse(prompt, content);
-                addMessage('ai', response);
-            }, 2000);
+
+            // Use backend AI (same service as breakdown)
+            fetch('/customai/process/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, content: decodedContentGlobal || '', prompt_type: document.getElementById('prompt-type').value })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const thinkingEl = document.getElementById(thinkingId);
+                if (thinkingEl) thinkingEl.remove();
+                if (data.success) {
+                    addMessage('ai', data.response);
+                } else {
+                    addMessage('ai', `Error: ${data.error || 'AI request failed'}`);
+                }
+            })
+            .catch(err => {
+                const thinkingEl = document.getElementById(thinkingId);
+                if (thinkingEl) thinkingEl.remove();
+                addMessage('ai', `Error calling AI: ${err}`);
+            });
         }
         
         function generateAIResponse(prompt, content) {
@@ -431,13 +589,28 @@
                 
                 // Show AI is thinking
                 const thinkingId = addMessage('ai', '🤔 Thinking...');
-                
-                // Simulate AI response
-                setTimeout(() => {
-                    document.getElementById(thinkingId).remove();
-                    const response = generateChatResponse(message);
-                    addMessage('ai', response);
-                }, 1500);
+
+                // Use backend AI for chat as well
+                fetch('/customai/process/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: message, content: decodedContentGlobal || '', prompt_type: document.getElementById('prompt-type').value })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const thinkingEl = document.getElementById(thinkingId);
+                    if (thinkingEl) thinkingEl.remove();
+                    if (data.success) {
+                        addMessage('ai', data.response);
+                    } else {
+                        addMessage('ai', `Error: ${data.error || 'AI request failed'}`);
+                    }
+                })
+                .catch(err => {
+                    const thinkingEl = document.getElementById(thinkingId);
+                    if (thinkingEl) thinkingEl.remove();
+                    addMessage('ai', `Error calling AI: ${err}`);
+                });
             }
         }
         

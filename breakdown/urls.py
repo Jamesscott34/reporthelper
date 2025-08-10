@@ -25,4 +25,5 @@ urlpatterns = [
     path('documents/', views.document_list, name='document_list'),
     path('documents/<int:document_id>/delete/', views.delete_document, name='delete_document'),
     path('customai/', views.custom_ai_view, name='custom_ai'),
+    path('customai/process/', views.custom_ai_process, name='custom_ai_process'),
 ] 

@@ -63,7 +63,11 @@ AI Report Writer is a modular platform that:
    cd Report_AI
    ```
 
-2. **Create `.env` file** (see Configuration section below)
+2. **Create `.env` file** from the template (see Configuration section below)
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys and settings
+   ```
 
 3. **Run the enhanced setup script**
    ```bash
@@ -128,7 +132,8 @@ Report_AI/
 ├── 📄 README.md                   # This file
 ├── 📄 requirements.txt            # Python dependencies
 ├── 📄 manage.py                   # Django management
-└── 📄 .env                        # Environment configuration
+├── 📄 env.example                 # Environment configuration template
+└── 📄 .env                        # Environment configuration (create from template)
 ```
 
 ## 🔄 Automatic Updates
@@ -206,9 +211,29 @@ ai_report_writer/
 
 ## 🔧 Configuration
 
-### Environment Variables (.env)
+### Environment Variables Setup
 
-Create a `.env` file in the project root with the following exact layout:
+The project uses environment variables for configuration. We provide two files to help you set this up:
+
+1. **`.env.example`** - Template showing all available configuration options
+2. **`.env`** - Your actual configuration file (create this from the template)
+
+#### Quick Setup
+
+1. **Copy the template**:
+   ```bash
+   cp env.example .env
+   ```
+
+2. **Edit `.env`** with your actual values:
+   ```bash
+   # Edit the file with your API keys and settings
+   nano .env
+   ```
+
+#### Environment Variables (.env)
+
+Create a `.env` file in the project root with the following layout:
 
 ```env
 # Django Configuration
@@ -232,6 +257,27 @@ DATABASE_URL=sqlite:///db.sqlite3
 # Logging Configuration
 LOG_LEVEL=INFO
 LOG_FILE=logs/app.log
+```
+
+#### View .env.example
+
+The `.env.example` file contains comprehensive configuration options including:
+
+- **Core Django Settings**: Debug, secret key, allowed hosts
+- **AI Model Configuration**: Multiple providers (OpenAI, Anthropic, OpenRoute, LM Studio, Local)
+- **Database Options**: SQLite, PostgreSQL, MySQL configurations
+- **Optional Services**: Email, Redis, Celery, logging
+- **Security Settings**: CSRF, CORS, SSL configurations
+- **File Upload Settings**: Size limits, allowed types
+- **Advanced Features**: Backup, monitoring, third-party integrations
+
+To view all available options:
+```bash
+# View the complete template
+cat env.example
+
+# Or open in your editor
+code env.example
 ```
 
 ### API Key Setup
@@ -325,7 +371,25 @@ python manage.py test
 2. **Add Dependencies**: Update `requirements.txt`
 3. **Create Migrations**: Run `python manage.py makemigrations`
 4. **Update Scripts**: Add new functionality to update scripts
-5. **Test**: Verify with sample documents
+5. **Update Environment Template**: Add new variables to `env.example`
+6. **Test**: Verify with sample documents
+
+### Environment File Management
+
+When adding new configuration options:
+
+1. **Add to `env.example`**: Include the new variable with a descriptive comment
+2. **Update README**: Document the new configuration option
+3. **Set Defaults**: Provide sensible default values in the template
+4. **Documentation**: Add usage examples and requirements
+
+Example of adding a new environment variable:
+```bash
+# In env.example
+# New Feature Configuration
+NEW_FEATURE_ENABLED=True
+NEW_FEATURE_API_KEY=your-api-key-here
+```
 
 ### Adding New AI Models
 
@@ -387,6 +451,13 @@ tar -xzf backups/ai_report_writer_backup_YYYYMMDD_HHMMSS.tar.gz
    - Ensure API keys are correctly set in `.env`
    - Check if API keys are valid and have sufficient credits
    - Verify API endpoint: https://openrouter.ai/api/v1
+   - **Tip**: Use `cat env.example` to see all available configuration options
+
+2. **Configuration Issues**
+   - Verify `.env` file exists and is properly formatted
+   - Check that all required variables are set
+   - Compare with `env.example` template for missing variables
+   - Ensure no extra spaces or quotes around values
 
 2. **Model Not Found**
    - Check model names in `.env` file

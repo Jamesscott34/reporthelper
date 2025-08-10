@@ -395,6 +395,12 @@ footer {
     color: #212529;
 }
 
+/* Breakdown detail: preview area */
+.breakdown-preview {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
 /* Internal workflow buttons in minimized state */
 .workflow-section.minimized .internal-workflow-buttons {
     display: none !important;

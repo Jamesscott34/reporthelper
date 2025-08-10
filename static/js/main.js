@@ -16,6 +16,52 @@ $(document).ready(function() {
     initializeComponents();
 });
 
+// Breakdown: regenerate from breakdown detail page
+window.regenerateBreakdown = function () {
+    if (!confirm('Are you sure you want to regenerate this breakdown? This will replace the current content.')) {
+        return;
+    }
+
+    var csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrf = csrfInput ? csrfInput.value : '';
+
+    var btn = document.querySelector('[data-regenerate-url]');
+    var targetUrl = btn ? btn.getAttribute('data-regenerate-url') : null;
+
+    if (!targetUrl) {
+        var path = window.location.pathname;
+        var match = path.match(/\/breakdown\/(\d+)/);
+        if (match) {
+            targetUrl = '/breakdown/' + match[1] + '/regenerate/';
+        }
+    }
+
+    if (!targetUrl) {
+        alert('Could not determine regenerate URL.');
+        return;
+    }
+
+    fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrf,
+            'Content-Type': 'application/json'
+        }
+    })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data && data.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data && data.error ? data.error : 'Unknown error'));
+            }
+        })
+        .catch(function (err) {
+            console.error('Error:', err);
+            alert('An error occurred while regenerating the breakdown.');
+        });
+};
+
 /**
  * Initialize file upload drag and drop functionality
  */

@@ -58,8 +58,8 @@ class AIBreakdownService:
         """
         for attempt in range(max_retries):
             try:
-                print(f"Attempt {attempt + 1}/{max_retries}")
-                print(f"API Key: {self.api_key[:10]}..." if self.api_key else "No API key")
+                logger.debug("Attempt %s/%s", attempt + 1, max_retries)
+                logger.debug("API Key present: %s", bool(self.api_key))
                 
                 # Use chat completions endpoint for better results
                 payload = {
@@ -83,18 +83,18 @@ class AIBreakdownService:
                     "X-Title": "AI Report Writer"  # Optional but recommended
                 }
                 
-                print(f"Making request to {self.chat_url} with model {self.model}")
-                print(f"Payload size: {len(str(payload))} characters")
+                logger.debug("POST %s model=%s", self.chat_url, self.model)
+                logger.debug("Payload size: %s chars", len(str(payload)))
                 
                 response = requests.post(self.chat_url, json=payload, headers=headers, timeout=120)
-                print(f"Response status: {response.status_code}")
+                logger.debug("Response status: %s", response.status_code)
                 
                 if not response.ok:
-                    print(f"HTTP error: {response.status_code} - {response.text}")
+                    logger.warning("HTTP error %s: %s", response.status_code, response.text)
                     response.raise_for_status()
                 
                 result = response.json()
-                print(f"Response JSON keys: {list(result.keys())}")
+                logger.debug("Response JSON keys: %s", list(result.keys()))
                 
                 # Extract response from chat completions format
                 if 'choices' in result and len(result['choices']) > 0:
@@ -104,24 +104,74 @@ class AIBreakdownService:
                     response_text = result.get('choices', [{}])[0].get('text', '')
                 
                 if response_text:
-                    print(f"Successfully received response ({len(response_text)} characters)")
+                    logger.debug("Received response len=%s", len(response_text))
                     return response_text
                 else:
-                    print(f"Empty response received on attempt {attempt + 1}")
-                    print(f"Full response: {result}")
+                    logger.debug("Empty response on attempt %s", attempt + 1)
+                    logger.debug("Full response: %s", result)
                     
             except requests.exceptions.RequestException as e:
-                print(f"Request failed on attempt {attempt + 1}: {e}")
+                logger.warning("Request failed on attempt %s: %s", attempt + 1, e)
                 if attempt == max_retries - 1:
                     logger.error(f"Failed to make request to OpenRoute AI after {max_retries} attempts: {e}")
                     return None
             except json.JSONDecodeError as e:
-                print(f"JSON decode failed on attempt {attempt + 1}: {e}")
+                logger.warning("JSON decode failed on attempt %s: %s", attempt + 1, e)
                 if attempt == max_retries - 1:
                     logger.error(f"Failed to parse OpenRoute AI response after {max_retries} attempts: {e}")
                     return None
         
         return None
+    
+    def run_freeform_prompt(self, prompt: str) -> Dict[str, Any]:
+        """
+        Send a freeform prompt to the configured AI model and return the raw text response.
+        
+        Args:
+            prompt: The complete prompt to send to the AI
+        
+        Returns:
+            Dict with success flag, response text (if any), and model name
+        """
+        try:
+            response_text = self._make_request(prompt)
+            if response_text:
+                return {
+                    'success': True,
+                    'response': response_text,
+                    'model_used': self.model
+                }
+            return {
+                'success': False,
+                'error': 'Empty response from AI model',
+                'model_used': self.model
+            }
+        except Exception as exc:
+            logger.error("Error running freeform prompt: %s", exc)
+            return {
+                'success': False,
+                'error': str(exc),
+                'model_used': self.model
+            }
+
+    def _load_step_by_step_prompt_template(self) -> Optional[str]:
+        """
+        Load the detailed step-by-step prompt template from the prompts folder.
+        Returns the template text or None if not found.
+        """
+        try:
+            from django.conf import settings as dj_settings
+            import os
+            template_path = os.path.join(
+                dj_settings.BASE_DIR, 'prompts', 'step_by_step_prompt.txt'
+            )
+            with open(template_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as exc:
+            logger.warning(
+                "Failed to load step-by-step prompt template: %s", str(exc)
+            )
+            return None
     
     def _check_models_available(self) -> bool:
         """
@@ -139,11 +189,11 @@ class AIBreakdownService:
             if response.status_code == 200:
                 models = response.json()
                 available_models = [model.get('id', '') for model in models.get('data', [])]
-                print(f"Available models: {available_models}")
+                logger.debug("Available models: %s", available_models)
                 return self.model in available_models
             return False
         except Exception as e:
-            print(f"Error checking models: {e}")
+            logger.warning("Error checking models: %s", e)
             return False
     
     def breakdown_document(self, text: str) -> Dict[str, Any]:
@@ -156,34 +206,31 @@ class AIBreakdownService:
         Returns:
             Dictionary containing the breakdown and metadata
         """
-        print(f"Starting AI breakdown of document ({len(text)} characters)")
-        print(f"Using model: {self.model}")
-        print(f"Host: {self.host}")
-        print(f"API key available: {bool(self.api_key)}")
+        logger.info("Starting AI breakdown: chars=%s model=%s host=%s api_key=%s",
+                    len(text), self.model, self.host, bool(self.api_key))
         
         # Check if models are available
         if not self._check_models_available():
-            print("Warning: Model availability check failed, proceeding anyway...")
+            logger.warning("Model availability check failed, proceeding anyway")
         
         # Clean and prepare the text
         cleaned_text = self._clean_text(text)
-        print(f"Cleaned text length: {len(cleaned_text)}")
+        logger.debug("Cleaned text length: %s", len(cleaned_text))
         
         # Try different prompts for better results
         prompts = self._get_breakdown_prompts(cleaned_text)
-        print(f"Generated {len(prompts)} prompts to try")
+        logger.debug("Generated %s prompts", len(prompts))
         
         for i, prompt in enumerate(prompts):
-            print(f"Trying prompt {i+1}/{len(prompts)}")
-            print(f"Prompt length: {len(prompt)}")
+            logger.debug("Trying prompt %s/%s len=%s", i + 1, len(prompts), len(prompt))
             response = self._make_request(prompt)
             
             if response:
-                print(f"Got response from prompt {i+1}, length: {len(response)}")
+                logger.debug("Got response from prompt %s len=%s", i + 1, len(response))
                 try:
                     breakdown_data = self._parse_breakdown_response(response)
                     if breakdown_data and breakdown_data.get('sections'):
-                        print(f"Successfully parsed breakdown with {len(breakdown_data['sections'])} sections")
+                        logger.debug("Parsed breakdown with %s sections", len(breakdown_data['sections']))
                         return {
                             'success': True,
                             'breakdown': breakdown_data,
@@ -192,13 +239,13 @@ class AIBreakdownService:
                             'prompt_used': i + 1
                         }
                 except Exception as e:
-                    print(f"Failed to parse response from prompt {i+1}: {e}")
+                    logger.warning("Failed to parse response from prompt %s: %s", i + 1, e)
                     continue
             else:
-                print(f"No response from prompt {i+1}")
+                logger.debug("No response from prompt %s", i + 1)
         
         # If all prompts fail, return a simple breakdown
-        print("All prompts failed, creating simple breakdown")
+        logger.warning("All prompts failed, creating simple breakdown")
         simple_breakdown = self._create_simple_breakdown(cleaned_text)
         
         return {
@@ -233,7 +280,7 @@ class AIBreakdownService:
             first_part = text[:max_length//2]
             last_part = text[-(max_length//2):]
             text = first_part + "\n\n[Content continues...]\n\n" + last_part
-            print(f"Document was {len(text)} characters, truncated to {len(text)} characters")
+            logger.debug("Document was truncated; new length=%s", len(text))
         
         return text.strip()
     
@@ -424,38 +471,37 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
     
     def create_step_by_step_guide(self, breakdown_content: str) -> Dict[str, Any]:
         """
-        Create simplified, actionable step-by-step instructions based on breakdown content.
+        Create comprehensive step-by-step instructions using the same approach as breakdown.
         
         Args:
-            breakdown_content: The breakdown content to convert to steps
+            breakdown_content: The breakdown content to convert to detailed steps
             
         Returns:
-            A step-by-step guide structure
+            A comprehensive step-by-step guide structure with subsections
         """
-        prompt = f"""
-        Based on the following breakdown content, create simplified, actionable step-by-step instructions.
-        Each step should be clear, specific, and easy to follow.
-        
-        Breakdown Content:
-        {breakdown_content}
-        
-        Please create:
-        1. 3-7 simple action steps
-        2. Each step should start with a verb (e.g., "Review", "Identify", "Create", "Implement")
-        3. Keep each step concise and actionable
-        4. Focus on practical actions the user can take
-        
-        Format the response as a structured breakdown with sections containing title and content.
-        """
-        
+        # Load the detailed, link-and-command-rich template from file
+        template = self._load_step_by_step_prompt_template()
+        if template:
+            # Enforce auto-example and output-only policy for backend generation too
+            prompt = template.replace('{INPUT_TEXT}', breakdown_content)
+        else:
+            # Minimal fallback (kept short to satisfy linters)
+            prompt = (
+                'Create a beginner-friendly, step-by-step guide with numbered '
+                'steps, short explanations of why, and commands for Windows '
+                '(PowerShell) and Linux/macOS (bash). Include verification '
+                'checks, troubleshooting tips, config snippets, and official '
+                'download links when relevant. Use markdown headings.\n\n'
+                f'Input:\n{breakdown_content}'
+            )
+
         try:
             response = self._make_request(prompt)
             if response:
                 return self._parse_breakdown_response(response)
-            else:
-                return self._create_simple_step_by_step(breakdown_content)
+            return self._create_simple_step_by_step(breakdown_content)
         except Exception as e:
-            logger.error(f"Error creating step-by-step guide: {e}")
+            logger.error("Error creating step-by-step guide: %s", e)
             return self._create_simple_step_by_step(breakdown_content)
     
     def _create_simple_step_by_step(self, content: str) -> Dict[str, Any]:
@@ -527,6 +573,10 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         8. Include a summary of findings and recommendations
         9. Add cross-references between sections where appropriate
         10. Use clear, professional language without unnecessary jargon
+        11. Length requirement: If the input explicitly requests a word count, 
+            meet or exceed that amount. Otherwise, produce no fewer than 500 words. 
+            Do not pad with filler; expand with concrete details, reasoning, and 
+            examples tied to the input.
 
         STRUCTURE:
         - Executive Summary (1.0)
@@ -546,6 +596,10 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         - Add relevant image placeholders with descriptive names
         - Use clear numbering system for easy reference
         - Ensure logical flow between sections
+
+        Output policy:
+        - Do not restate these instructions or the input headers; output only the
+          final report content that satisfies all requirements.
 
         Format the response as a structured report with sections 
         containing title and content. Each section should be 
@@ -612,11 +666,11 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
                     'content': '\n'.join(current_content).strip()
                 })
             
-            # Ensure we have at least some content
+            # Ensure we have at least some content; do not truncate so the UI shows everything
             if not sections:
                 sections = [{
                     'title': 'Report Summary',
-                    'content': cleaned_response[:1000] + "..." if len(cleaned_response) > 1000 else cleaned_response
+                    'content': cleaned_response
                 }]
             
             return {

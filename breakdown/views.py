@@ -1,3 +1,4 @@
+# flake8: noqa
 """
 Views for the breakdown app.
 
@@ -53,7 +54,7 @@ def process_document_background(document_id, breakdown_id):
         document.save()
         
         # Extract text from the document
-        print(f"Extracting text from {document.file.path}...")
+        # logging removed for production verbosity
         extracted_text = extract_text_from_file(
             document.file.path,
             document.file_type
@@ -66,7 +67,7 @@ def process_document_background(document_id, breakdown_id):
         document.status = 'completed'
         document.save()
         
-        print(f"Text extracted successfully. Length: {len(extracted_text)} characters")
+        # logging removed
         
         # Don't run AI automatically - let user choose when to run it
         # Just mark the document as ready for AI processing
@@ -77,10 +78,10 @@ def process_document_background(document_id, breakdown_id):
         breakdown.status = 'ready'
         breakdown.save()
         
-        print(f"Document ready for AI processing. User can now choose workflow options.")
+        # logging removed
             
     except Exception as e:
-        print(f"Error processing document {document_id}: {str(e)}")
+        # logging removed
         try:
             document = Document.objects.get(id=document_id)
             document.status = 'failed'
@@ -197,13 +198,11 @@ def run_ai_workflow(request, breakdown_id):
     Run AI workflow when user clicks one of the workflow buttons.
     """
     try:
-        print(f"Starting AI workflow for breakdown {breakdown_id}")
+        # logging removed
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
         document = breakdown.document
         
-        print(f"Document ID: {document.id}, Status: {document.status}")
-        print(f"Has extracted text: {bool(document.extracted_text)}")
-        print(f"Extracted text length: {len(document.extracted_text) if document.extracted_text else 0}")
+        # logging removed
         
         # Check if document has extracted text
         if not document.extracted_text:
@@ -217,22 +216,21 @@ def run_ai_workflow(request, breakdown_id):
         workflow_type = data.get('workflow_type', 'breakdown')
         current_content = data.get('current_content', document.extracted_text)
         
-        print(f"Workflow type: {workflow_type}")
-        print(f"Content length: {len(current_content)}")
+        # logging removed
         
         # Update status to processing
         breakdown.status = 'processing'
         breakdown.save()
         
-        print("Starting AI service...")
+        # logging removed
         # Run AI processing based on workflow type, using current content
         ai_service = AIBreakdownService()
         
         if workflow_type == 'breakdown':
-            print("Running breakdown workflow...")
+            # logging removed
             result = ai_service.breakdown_document(current_content)
         elif workflow_type == 'stepbystep':
-            print("Running step-by-step workflow...")
+            # logging removed
             # For step-by-step, create simplified action steps based on the content
             step_result = ai_service.create_step_by_step_guide(current_content)
             # Convert step-by-step result to expected format
@@ -244,20 +242,20 @@ def run_ai_workflow(request, breakdown_id):
                 'step_by_step_data': step_result
             }
         elif workflow_type == 'report':
-            print("Running report workflow...")
+            # logging removed
             # For report, create a detailed report reviewing both extracted text and breakdown
             result = ai_service.create_detailed_report(
                 document.extracted_text, 
                 current_content
             )
         elif workflow_type == 'review-compare':
-            print("Running review-compare workflow...")
+            # logging removed
             result = ai_service.breakdown_document(current_content)
         else:
-            print("Running default breakdown workflow...")
+            # logging removed
             result = ai_service.breakdown_document(current_content)
         
-        print(f"AI result: {result}")
+        # logging removed
         
         if result.get('success', False):
             # Update breakdown with results
@@ -276,7 +274,7 @@ def run_ai_workflow(request, breakdown_id):
             breakdown.status = 'completed'
             breakdown.save()
             
-            print("AI workflow completed successfully")
+            # logging removed
             return JsonResponse({
                 'success': True,
                 'message': f'{workflow_type.replace("-", " ").title()} completed successfully!',
@@ -286,14 +284,14 @@ def run_ai_workflow(request, breakdown_id):
         else:
             breakdown.status = 'failed'
             breakdown.save()
-            print(f"AI workflow failed: {result.get('error', 'Unknown error')}")
+            # logging removed
             return JsonResponse({
                 'success': False,
                 'error': result.get('error', 'AI processing failed')
             })
             
     except Exception as e:
-        print(f"Exception in AI workflow: {str(e)}")
+        # logging removed
         import traceback
         traceback.print_exc()
         return JsonResponse({
@@ -531,6 +529,117 @@ def custom_ai_view(request):
     return render(request, 'customai.html')
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def custom_ai_process(request):
+    """
+    Process Custom AI prompts using the same backend model/service as breakdown.
+    Expects JSON body: { prompt: string, content: string }
+    Returns JSON: { success: bool, response: string, model_used: string }
+    """
+    try:
+        data = json.loads(request.body or '{}')
+        prompt = data.get('prompt', '').strip()
+        content = data.get('content', '').strip()
+        prompt_type = data.get('prompt_type', '').strip()
+
+        if not prompt:
+            return JsonResponse({
+                'success': False,
+                'error': 'Prompt is required'
+            }, status=400)
+
+        ai_service = AIBreakdownService()
+
+        # If user asks for a report, generate a full report instead of step-by-step
+        wants_report = any(k in (prompt + " " + content).lower() for k in [
+            ' report', 'write a report', 'word report', '600 word', '500 word'
+        ])
+
+        # Prefer standardized template when a known prompt_type is provided
+        if prompt_type == 'detailed-steps':
+            template = ai_service._load_step_by_step_prompt_template()
+            if template:
+                full_prompt = template.replace('{INPUT_TEXT}', content)
+            else:
+                # Minimal robust fallback
+                full_prompt = (
+                    'Create a beginner-friendly, step-by-step guide with numbered '
+                    'steps, WHY each step matters, Windows (PowerShell) and '
+                    'Linux/macOS (bash) commands, config snippets, verification '
+                    'checks, troubleshooting tips, and official download links.\n\n'
+                    f'Input:\n{content}'
+                )
+            # First, generate the step-by-step guide
+            steps_result = ai_service.run_freeform_prompt(full_prompt)
+
+            # If a report was requested too, generate and append it
+            if wants_report:
+                report = ai_service.create_detailed_report(content, content)
+                combined_text = ''
+                if steps_result.get('success'):
+                    combined_text += steps_result.get('response', '')
+                if report and report.get('sections'):
+                    parts = []
+                    for idx, sec in enumerate(report['sections'], start=1):
+                        title = sec.get('title', f'Section {idx}')
+                        body = sec.get('content', '')
+                        parts.append(f"{title}\n{body}")
+                    combined_text += "\n\n" + "\n\n".join(parts)
+                return JsonResponse({
+                    'success': True,
+                    'response': combined_text.strip() or 'No content generated',
+                    'model_used': getattr(ai_service, 'model', 'Unknown')
+                })
+
+            # Otherwise just return the step-by-step output
+            return JsonResponse({
+                'success': steps_result.get('success', False),
+                'response': steps_result.get('response', '') or 'No content generated',
+                'model_used': steps_result.get('model_used', getattr(ai_service, 'model', 'Unknown'))
+            })
+
+        # If user asks for a report but no detailed-steps were requested, return only the report
+        if wants_report:
+            report = ai_service.create_detailed_report(content, content)
+            if report and report.get('sections'):
+                parts = []
+                for idx, sec in enumerate(report['sections'], start=1):
+                    title = sec.get('title', f'Section {idx}')
+                    body = sec.get('content', '')
+                    parts.append(f"{title}\n{body}")
+                return JsonResponse({
+                    'success': True,
+                    'response': "\n\n".join(parts),
+                    'model_used': report.get('model_used', 'Unknown')
+                })
+        else:
+            # If content is provided, append it beneath the prompt with clear delimiter
+            full_prompt = prompt
+            if content:
+                full_prompt = f"{prompt}\n\n---\n\nCONTENT TO ANALYZE:\n{content}"
+
+        result = ai_service.run_freeform_prompt(full_prompt)
+
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'response': result.get('response', ''),
+                'model_used': result.get('model_used', 'Unknown')
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'AI request failed'),
+                'model_used': result.get('model_used', 'Unknown')
+            }, status=502)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
 def document_list(request):
     """
     Display a list of all uploaded documents.
@@ -652,11 +761,20 @@ def edit_breakdown_section(request, breakdown_id):
         
         # Update the specific section
         if 'sections' in current_content and isinstance(current_content['sections'], list):
-            # Find and update the section
+            # Find and update the section by index (1-based)
             for i, section in enumerate(current_content['sections']):
                 if str(i + 1) == str(section_id):
-                    section['title'] = new_title
-                    section['content'] = new_content
+                    # Support both dict-based sections and legacy string sections
+                    if isinstance(section, dict):
+                        section['title'] = new_title
+                        section['content'] = new_content
+                        current_content['sections'][i] = section
+                    else:
+                        # Convert string section to structured dict
+                        current_content['sections'][i] = {
+                            'title': new_title,
+                            'content': new_content
+                        }
                     break
         
         # Save the updated breakdown

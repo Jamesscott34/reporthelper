@@ -58,6 +58,42 @@ Document:
 Provide an executive summary breakdown:"""
         }
     ],
+    'step_by_step': [
+        {
+            'name': 'detailed_steps_links_commands',
+            'prompt': """You are an expert technical writing assistant. Transform the provided text into a clear, beginner-friendly, step-by-step guide that greatly expands the original.
+
+Primary goal
+- Turn complex content into a comprehensive how-to with numbered steps and practical actions anyone can follow.
+
+What to include (mandatory)
+1) Overview: plain-language summary and expected outcomes.
+2) Preparation checklist: required tools/software with OFFICIAL links only; OS support (Windows/macOS/Linux); prerequisites.
+3) Step-by-step instructions (core): for each step include What to do, Why it matters, exact commands and/or GUI clicks.
+   - Windows (PowerShell): use fenced blocks marked powershell
+   - Linux/macOS (bash): use fenced blocks marked bash
+   - Config snippets with proper language labels (e.g., nginx, yaml, json)
+   - Verification checks and common troubleshooting tips per step
+   - If OS differs, show per-OS subsections
+4) Examples/analogies for abstract ideas.
+5) Visual aids suggestions (e.g., simple diagram descriptions).
+6) Sources: official links only; do NOT invent links. If unknown, say so.
+
+Constraints and style
+- Keep a logical flow; short sentences; no fluff.
+- Prefer secure defaults; do not invent versions or links.
+- Include a brief "Summary & Next Steps" at the end.
+- Auto-example rule: If the input asks to "choose one", "give an example", or does not specify a concrete case, select a sensible, specific example and apply the full guide to that example. If the domain implies security/OWASP and no example is given, use Cross-Site Scripting (XSS) as the default. Do not ask follow-up questions—state any assumptions briefly and proceed.
+- Auto-report rule: If the input requests a "report" or similar deliverable, generate a full report instead of a step-by-step guide. Minimum length: 500 words (meet any explicit word count if provided). Include clear numbered sections, concise prose, and image placeholders with descriptive captions (e.g., "Figure 1.1: Data Flow Diagram").
+- Output policy: Do not repeat these instructions or the input verbatim. Produce the final deliverable only.
+
+SECTION: {section}
+
+CONTENT:
+{text}
+"""
+        }
+    ],
 
     'academic': [
         {
