@@ -58,6 +58,9 @@ class AIBreakdownService:
         """
         for attempt in range(max_retries):
             try:
+                print(f"Attempt {attempt + 1}/{max_retries}")
+                print(f"API Key: {self.api_key[:10]}..." if self.api_key else "No API key")
+                
                 # Use chat completions endpoint for better results
                 payload = {
                     "model": self.model,
@@ -81,10 +84,17 @@ class AIBreakdownService:
                 }
                 
                 print(f"Making request to {self.chat_url} with model {self.model}")
+                print(f"Payload size: {len(str(payload))} characters")
+                
                 response = requests.post(self.chat_url, json=payload, headers=headers, timeout=120)
-                response.raise_for_status()
+                print(f"Response status: {response.status_code}")
+                
+                if not response.ok:
+                    print(f"HTTP error: {response.status_code} - {response.text}")
+                    response.raise_for_status()
                 
                 result = response.json()
+                print(f"Response JSON keys: {list(result.keys())}")
                 
                 # Extract response from chat completions format
                 if 'choices' in result and len(result['choices']) > 0:
@@ -98,6 +108,7 @@ class AIBreakdownService:
                     return response_text
                 else:
                     print(f"Empty response received on attempt {attempt + 1}")
+                    print(f"Full response: {result}")
                     
             except requests.exceptions.RequestException as e:
                 print(f"Request failed on attempt {attempt + 1}: {e}")
@@ -146,6 +157,9 @@ class AIBreakdownService:
             Dictionary containing the breakdown and metadata
         """
         print(f"Starting AI breakdown of document ({len(text)} characters)")
+        print(f"Using model: {self.model}")
+        print(f"Host: {self.host}")
+        print(f"API key available: {bool(self.api_key)}")
         
         # Check if models are available
         if not self._check_models_available():
@@ -153,15 +167,19 @@ class AIBreakdownService:
         
         # Clean and prepare the text
         cleaned_text = self._clean_text(text)
+        print(f"Cleaned text length: {len(cleaned_text)}")
         
         # Try different prompts for better results
         prompts = self._get_breakdown_prompts(cleaned_text)
+        print(f"Generated {len(prompts)} prompts to try")
         
         for i, prompt in enumerate(prompts):
             print(f"Trying prompt {i+1}/{len(prompts)}")
+            print(f"Prompt length: {len(prompt)}")
             response = self._make_request(prompt)
             
             if response:
+                print(f"Got response from prompt {i+1}, length: {len(response)}")
                 try:
                     breakdown_data = self._parse_breakdown_response(response)
                     if breakdown_data and breakdown_data.get('sections'):
@@ -176,6 +194,8 @@ class AIBreakdownService:
                 except Exception as e:
                     print(f"Failed to parse response from prompt {i+1}: {e}")
                     continue
+            else:
+                print(f"No response from prompt {i+1}")
         
         # If all prompts fail, return a simple breakdown
         print("All prompts failed, creating simple breakdown")
@@ -399,5 +419,252 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         return {
             'sections': sections,
             'raw_response': 'Simple breakdown created automatically',
+            'total_sections': len(sections)
+        }
+    
+    def create_step_by_step_guide(self, breakdown_content: str) -> Dict[str, Any]:
+        """
+        Create simplified, actionable step-by-step instructions based on breakdown content.
+        
+        Args:
+            breakdown_content: The breakdown content to convert to steps
+            
+        Returns:
+            A step-by-step guide structure
+        """
+        prompt = f"""
+        Based on the following breakdown content, create simplified, actionable step-by-step instructions.
+        Each step should be clear, specific, and easy to follow.
+        
+        Breakdown Content:
+        {breakdown_content}
+        
+        Please create:
+        1. 3-7 simple action steps
+        2. Each step should start with a verb (e.g., "Review", "Identify", "Create", "Implement")
+        3. Keep each step concise and actionable
+        4. Focus on practical actions the user can take
+        
+        Format the response as a structured breakdown with sections containing title and content.
+        """
+        
+        try:
+            response = self._make_request(prompt)
+            if response:
+                return self._parse_breakdown_response(response)
+            else:
+                return self._create_simple_step_by_step(breakdown_content)
+        except Exception as e:
+            logger.error(f"Error creating step-by-step guide: {e}")
+            return self._create_simple_step_by_step(breakdown_content)
+    
+    def _create_simple_step_by_step(self, content: str) -> Dict[str, Any]:
+        """
+        Create simple step-by-step instructions when AI fails.
+        
+        Args:
+            content: The content to break into steps
+            
+        Returns:
+            Simple step-by-step structure
+        """
+        # Split content into logical steps
+        sentences = [s.strip() for s in content.split('.') if s.strip()]
+        
+        steps = []
+        for i, sentence in enumerate(sentences[:5]):  # Limit to 5 steps
+            if len(sentence) > 20:  # Only include substantial sentences
+                # Make it more action-oriented
+                action = sentence.split()[0] if sentence.split() else 'Review'
+                steps.append({
+                    'title': f'Step {i + 1}: {action.title()}',
+                    'content': sentence
+                })
+        
+        return {
+            'sections': steps,
+            'raw_response': 'Simple step-by-step guide created automatically',
+            'total_sections': len(steps)
+        }
+    
+    def create_detailed_report(self, extracted_text: str, 
+                              breakdown_content: str) -> Dict[str, Any]:
+        """
+        Create a comprehensive, detailed report reviewing the extracted 
+        text and breakdown.
+        
+        Args:
+            extracted_text: The original extracted text from the document
+            breakdown_content: The AI-generated breakdown content
+            
+        Returns:
+            A detailed report structure with references and image 
+            placeholders
+        """
+        prompt = f"""
+        Create a comprehensive, detailed report based on the following 
+        information:
+
+        EXTRACTED TEXT:
+        {extracted_text[:2000]}
+
+        BREAKDOWN CONTENT:
+        {breakdown_content[:2000]}
+
+        REQUIREMENTS:
+        1. Create a professional, detailed report with no fluff or 
+           repetition
+        2. Remove all markdown formatting (no **, *, "", etc.)
+        3. Break down each part into clear, detailed sections with 
+           proper numbering
+        4. Add reference numbers to each major section (e.g., 1.0, 
+           1.1, 1.2, 2.0, etc.)
+        5. Include image placeholders where relevant with descriptive 
+           names (e.g., "Figure 1.1: Process Flow Diagram", "Image 2.3: 
+           Data Structure Overview")
+        6. Make the report fluid and well-structured with logical flow
+        7. Focus on what was accomplished and the methodology used
+        8. Include a summary of findings and recommendations
+        9. Add cross-references between sections where appropriate
+        10. Use clear, professional language without unnecessary jargon
+
+        STRUCTURE:
+        - Executive Summary (1.0)
+        - Document Overview and Scope (2.0)
+        - Methodology and Approach (3.0)
+        - Detailed Analysis and Breakdown (4.0)
+          - Section 4.1: Content Analysis
+          - Section 4.2: Key Components Identified
+          - Section 4.3: Process Flow Analysis
+        - Key Findings and Insights (5.0)
+        - Recommendations and Next Steps (6.0)
+        - References and Resources (7.0)
+
+        For each section:
+        - Provide comprehensive content that explains what was done
+        - Include specific examples from the document
+        - Add relevant image placeholders with descriptive names
+        - Use clear numbering system for easy reference
+        - Ensure logical flow between sections
+
+        Format the response as a structured report with sections 
+        containing title and content. Each section should be 
+        comprehensive and well-detailed.
+        """
+        
+        try:
+            response = self._make_request(prompt)
+            if response:
+                return self._parse_report_response(response)
+            else:
+                return self._create_simple_report(extracted_text, 
+                                                breakdown_content)
+        except Exception as e:
+            logger.error(f"Error creating detailed report: {e}")
+            return self._create_simple_report(extracted_text, 
+                                            breakdown_content)
+    
+    def _parse_report_response(self, response: str) -> Dict[str, Any]:
+        """
+        Parse the AI-generated report response into structured format.
+        
+        Args:
+            response: The AI response to parse
+            
+        Returns:
+            Parsed report structure
+        """
+        try:
+            # Clean the response
+            cleaned_response = self._clean_text(response)
+            
+            # Split into sections based on headers
+            sections = []
+            current_section = None
+            current_content = []
+            
+            lines = cleaned_response.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Check if this is a new section header
+                if re.match(r'^\d+\.\s+', line) or re.match(r'^\d+\.\d+\s+', line) or line.isupper():
+                    # Save previous section if exists
+                    if current_section:
+                        sections.append({
+                            'title': current_section,
+                            'content': '\n'.join(current_content).strip()
+                        })
+                    
+                    # Start new section
+                    current_section = line
+                    current_content = []
+                else:
+                    if current_section:
+                        current_content.append(line)
+            
+            # Add the last section
+            if current_section and current_content:
+                sections.append({
+                    'title': current_section,
+                    'content': '\n'.join(current_content).strip()
+                })
+            
+            # Ensure we have at least some content
+            if not sections:
+                sections = [{
+                    'title': 'Report Summary',
+                    'content': cleaned_response[:1000] + "..." if len(cleaned_response) > 1000 else cleaned_response
+                }]
+            
+            return {
+                'sections': sections,
+                'raw_response': cleaned_response,
+                'total_sections': len(sections)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error parsing report response: {e}")
+            return {
+                'sections': [{'title': 'Report', 'content': response}],
+                'raw_response': response,
+                'total_sections': 1
+            }
+    
+    def _create_simple_report(self, extracted_text: str, breakdown_content: str) -> Dict[str, Any]:
+        """
+        Create a simple report when AI fails.
+        
+        Args:
+            extracted_text: The original extracted text
+            breakdown_content: The breakdown content
+            
+        Returns:
+            Simple report structure
+        """
+        sections = [
+            {
+                'title': '1.0 Executive Summary',
+                'content': f'This report summarizes the analysis of the document containing {len(extracted_text)} characters of text.'
+            },
+            {
+                'title': '2.0 Document Analysis',
+                'content': f'The document was processed and broken down into {len(breakdown_content.split())} words of structured content.'
+            },
+            {
+                'title': '3.0 Key Findings',
+                'content': 'The document contains valuable information that has been organized into actionable sections for better understanding and implementation.'
+            },
+            {
+                'title': '4.0 Recommendations',
+                'content': 'Consider implementing the structured breakdown to improve workflow efficiency and understanding of the document content.'
+            }
+        ]
+        
+        return {
+            'sections': sections,
+            'raw_response': 'Simple report created automatically',
             'total_sections': len(sections)
         } 

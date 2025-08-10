@@ -98,11 +98,292 @@
     border-radius: 4px;
     padding: 8px;
     margin: 5px 0;
+}
+
+/* Step-by-Step Guide Styling */
+.step-by-step-guide {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+/* Step-by-Step Button Styling */
+.btn-step-by-step {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    border: none;
+    color: white;
+    font-size: 0.8rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-step-by-step:hover {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-step-by-step:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Section Header Styling */
+.section-header {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.section-header h6 {
+    margin-bottom: 0;
+    color: #495057;
+    font-weight: 600;
+}
+
+/* Breakdown Section Item Styling */
+.breakdown-section-item {
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.breakdown-section-item:hover {
+    border-color: #17a2b8;
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.1);
+}
+
+/* Report Section Styling */
+.report-section {
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.report-section:hover {
+    border-color: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);
+}
+
+.step-guide-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-guide-title {
+    color: #495057;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.step-guide-title i {
+    margin-right: 8px;
+    color: #007bff;
+}
+
+.detailed-steps {
+    background: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.detailed-steps h6 {
+    color: #1976d2;
+    margin-bottom: 10px;
+}
+
+.steps-content {
+    line-height: 1.6;
+    color: #424242;
+}
+
+.step-item .step-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.step-item .step-header button {
+    flex-shrink: 0;
+}
+
+/* Section Actions Styling */
+.section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-actions .btn {
+    flex-shrink: 0;
+}
+
+/* Workflow Actions Styling */
+.workflow-actions {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.workflow-actions .btn {
+    min-width: 140px;
+}
+
+.workflow-actions .btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.workflow-actions .btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+/* Subsection Buttons Styling */
+.subsection-buttons {
+    border-top: 1px solid #e9ecef;
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+
+.subsection-buttons h6 {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+
+.subsection-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.subsection-grid .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+}
+
+.original-content {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.processed-steps {
+    background: white;
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+/* Process All Button Styling */
+.process-all-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.process-all-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    color: white;
+}
+
+.process-all-section:disabled {
+    opacity: 0.7;
+    transform: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
     cursor: pointer;
 }
 
 .marker-item:hover {
-    background: #e9ecef;
+    background-color: #e9ecef;
+    border-color: #007bff;
+}
+
+/* Unified Workflow Styling */
+.unified-workflow-section {
+    margin-bottom: 2rem;
+}
+
+.workflow-step {
+    transition: all 0.3s ease;
+    border: 2px solid transparent !important;
+}
+
+.workflow-step:hover {
+    border-color: #007bff !important;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.step-icon {
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+.workflow-step:nth-child(1) .step-icon {
+    color: #007bff;
+}
+
+.workflow-step:nth-child(2) .step-icon {
+    color: #ffc107;
+}
+
+.workflow-step:nth-child(3) .step-icon {
+    color: #28a745;
+}
+
+#prompt-preview-section {
+    border-left: 4px solid #17a2b8;
+}
+
+#prompt-preview-content {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.form-select-sm, .form-control-sm {
+    font-size: 0.875rem;
+}
+
+.workflow-step h6 {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.workflow-step p {
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+}
 }
 
 .marker-item.active {
@@ -197,6 +478,200 @@
     display: inline-block;
     margin-top: 1rem;
 }
+
+/* Save Section Styles */
+.save-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.save-section h3 {
+    color: #495057;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.save-buttons {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.save-group {
+    flex: 1;
+    min-width: 300px;
+}
+
+.save-group h4 {
+    color: #6c757d;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.format-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.save-btn {
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.save-btn i {
+    font-size: 1.1rem;
+}
+
+.save-status {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 6px;
+    display: none;
+}
+
+.save-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: block;
+}
+
+.save-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    display: block;
+}
+
+.save-status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+    display: block;
+}
+
+/* Report Section Styles */
+.report-section {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 25px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.report-section h3 {
+    color: #28a745;
+    margin-bottom: 20px;
+    font-size: 1.6rem;
+    border-bottom: 2px solid #28a745;
+    padding-bottom: 10px;
+}
+
+.report-content {
+    line-height: 1.6;
+    color: #495057;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.loading-spinner i {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    color: #007bff;
+}
+
+.report-section .section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.report-section .section h4 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.report-section .section p {
+    margin-bottom: 10px;
+    text-align: justify;
+}
+
+.report-section .image-placeholder {
+    background: #e9ecef;
+    border: 2px dashed #6c757d;
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+    margin: 15px 0;
+    color: #6c757d;
+}
+
+.report-section .image-placeholder i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #adb5bd;
+}
+
+.report-section .reference {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+    color: #856404;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .save-buttons {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .save-group {
+        min-width: auto;
+    }
+
+    .format-buttons {
+        justify-content: center;
+    }
+
+    .save-btn {
+        min-width: 120px;
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+}
 </style>
 {% endblock %}
 
@@ -229,13 +704,13 @@
                                 <li><strong>Title:</strong> {{ breakdown.document.title }}</li>
                                 <li><strong>Type:</strong> {{ breakdown.document.file_type|upper }}</li>
                                 <li><strong>Uploaded:</strong> {{ breakdown.document.uploaded_at|date:"M d, Y H:i" }}</li>
-                                <li><strong>AI Model:</strong> {{ breakdown.ai_model_used }}</li>
+                                <li><strong>Status:</strong> <span class="badge bg-info">{{ breakdown.document.status }}</span></li>
                             </ul>
                         </div>
                         <div class="col-md-6">
-                            <h6>Breakdown Stats</h6>
+                            <h6>Document Stats</h6>
                             <ul class="list-unstyled">
-                                <li><strong>Sections:</strong> {{ breakdown.content.sections|length }}</li>
+                                <li><strong>Text Length:</strong> {{ document.extracted_text|length }} characters</li>
                                 <li><strong>Created:</strong> {{ breakdown.created_at|date:"M d, Y H:i" }}</li>
                                 <li><strong>Status:</strong> <span class="badge bg-success">{{ breakdown.status }}</span></li>
                             </ul>
@@ -244,16 +719,16 @@
 
                     <hr>
 
-                    <!-- Full Breakdown Content -->
+                    <!-- Document Processing Status -->
                     <div id="breakdown-content">
-                        <h5><i class="fas fa-list-ul"></i> Full Breakdown</h5>
+                        {% csrf_token %}
                         
                         {% if breakdown.status == 'processing' %}
                             <!-- Loading Screen -->
                             <div class="loading-screen">
                                 <div class="loading-spinner"></div>
-                                <h3>Processing Document with AI</h3>
-                                <p class="status-message">This may take a few moments depending on the document size...</p>
+                                <h3>Processing Document</h3>
+                                <p class="status-message">Extracting text from your document...</p>
                                 
                                 <div class="step-indicator">
                                     <div class="step active" id="step1">
@@ -265,12 +740,8 @@
                                         Extract Text
                                     </div>
                                     <div class="step" id="step3">
-                                        <i class="fas fa-robot"></i><br>
-                                        AI Analysis
-                                    </div>
-                                    <div class="step" id="step4">
-                                        <i class="fas fa-eye"></i><br>
-                                        View Results
+                                        <i class="fas fa-check"></i><br>
+                                        Text Ready
                                     </div>
                                 </div>
                                 
@@ -279,8 +750,8 @@
                                 </div>
                                 
                                 <div id="statusMessage" class="status-message">Initializing...</div>
-                                <div class="model-info">
-                                    <i class="fas fa-brain"></i> Using AI Model: {{ breakdown.ai_model_used }} (OpenRoute AI)
+                                <div class="ready-info">
+                                    <i class="fas fa-info-circle"></i> Text will be extracted and ready for AI processing
                                 </div>
                             </div>
                             
@@ -301,91 +772,1325 @@
                                     // Simulate progress updates
                                     setTimeout(function() {
                                         updateStep(2);
-                                        updateProgress(25);
+                                        updateProgress(50);
                                         updateStatus('Extracting text from document...');
                                     }, 1000);
                                     
                                     setTimeout(function() {
                                         updateStep(3);
-                                        updateProgress(50);
-                                        updateStatus('Analyzing document with AI...');
+                                        updateProgress(100);
+                                        updateStatus('Text extraction complete! Ready for AI processing.');
                                     }, 3000);
                                 }
                                 
-                                function updateProgress(percent) {
-                                    $('#progressFill').css('width', percent + '%');
+                                function updateStep(stepNumber) {
+                                    // Remove active class from all steps
+                                    document.querySelectorAll('.step').forEach(step => {
+                                        step.classList.remove('active');
+                                    });
+                                    
+                                    // Add active class to current step
+                                    document.getElementById(`step${stepNumber}`).classList.add('active');
                                 }
                                 
-                                function updateStep(stepNumber) {
-                                    $('.step').removeClass('active completed');
-                                    
-                                    for (var i = 1; i < stepNumber; i++) {
-                                        $('#step' + i).addClass('completed');
-                                    }
-                                    
-                                    $('#step' + stepNumber).addClass('active');
+                                function updateProgress(percentage) {
+                                    document.getElementById('progressFill').style.width = percentage + '%';
                                 }
                                 
                                 function updateStatus(message) {
-                                    $('#statusMessage').text(message);
+                                    document.getElementById('statusMessage').textContent = message;
                                 }
                                 
                                 function checkBreakdownStatus() {
-                                    $.ajax({
-                                        url: '{% url "breakdown:breakdown_status" breakdown.id %}',
-                                        type: 'GET',
-                                        success: function(data) {
-                                            if (data.status === 'completed' || data.has_content || data.has_raw_breakdown) {
+                                    fetch('{% url "breakdown:breakdown_status" breakdown.id %}')
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            if (data.document && data.document.extracted_text) {
                                                 location.reload();
                                             }
-                                        }
-                                    });
+                                        })
+                                        .catch(error => console.error('Error checking status:', error));
                                 }
                             </script>
-                        {% elif breakdown.content.sections and breakdown.content.sections|length > 0 %}
-                            {% for section in breakdown.content.sections %}
-                                <div class="breakdown-section" id="section-{{ forloop.counter }}">
-                                    <div class="section-marker" onclick="addMarker({{ forloop.counter }}, '{{ section|truncatewords:10|escapejs }}')">
-                                        {{ forloop.counter }}
+                            
+                        {% elif document.extracted_text %}
+                            <!-- Extracted Text Display -->
+                            <div class="extracted-text-section mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6><i class="fas fa-file-text"></i> Extracted Text Content</h6>
+                                    <div class="d-flex align-items-center">
+                                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleTextMinimize()" id="minimize-btn">
+                                            <i class="fas fa-minus" id="minimize-icon"></i>
+                                            <span id="minimize-text">Minimize</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="toggleTextEdit()">
+                                            <i class="fas fa-edit"></i> Edit Text
+                                        </button>
+                                        <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(0, 'Extracted Text', '{{ document.extracted_text|escapejs }}')">
+                                            <i class="fas fa-stairs"></i> Step by Step
+                                        </button>
                                     </div>
-                                    <div class="section-content">
-                                        <h6 class="text-primary">Section {{ forloop.counter }}</h6>
-                                        <div class="section-text">{{ section|linebreaks }}</div>
-                                        
-                                        <!-- Comment Section -->
-                                        <div class="comment-section mt-3" id="comment-section-{{ forloop.counter }}" style="display: none;">
-                                            <div class="comment-box">
-                                                <div class="comment-header">
-                                                    <i class="fas fa-comment"></i> Comments for Section {{ forloop.counter }}
+                                </div>
+                                
+                                <!-- Editable Text Area -->
+                                <div id="text-display" class="border rounded p-3 bg-light">
+                                    <div id="text-content" class="text-content">
+                                        {{ document.extracted_text|linebreaks }}
+                                    </div>
+                                    <div id="text-editor" class="text-editor" style="display: none;">
+                                        <textarea class="form-control" id="editable-text" rows="20">{{ document.extracted_text }}</textarea>
+                                        <div class="mt-2">
+                                            <button class="btn btn-success btn-sm" onclick="saveTextChanges()">
+                                                <i class="fas fa-save"></i> Save Changes
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm" onclick="cancelTextEdit()">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- New Workflow Buttons -->
+                            <div class="workflow-buttons mb-4">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="workflow-button-container">
+                                            <button class="btn btn-primary w-100 py-3" id="breakdown-btn" onclick="showBreakdown()">
+                                                <i class="fas fa-list-ul"></i><br>
+                                                <strong>Breakdown</strong>
+                                            </button>
+                                            <div class="loading-overlay" id="breakdown-loading" style="display: none;">
+                                                <div class="loading-content">
+                                                    <div class="spinner-border text-light" role="status"></div>
+                                                    <p class="mt-2 text-light">Processing Breakdown...</p>
+                                                    <div class="progress mt-2" style="height: 6px;">
+                                                        <div class="progress-bar bg-light" id="breakdown-progress" style="width: 0%"></div>
+                                                    </div>
                                                 </div>
-                                                <textarea class="comment-input" id="comment-{{ forloop.counter }}" 
-                                                          placeholder="Add your comments or suggestions for this section..."></textarea>
-                                                <button class="btn btn-sm btn-primary" onclick="saveComment({{ forloop.counter }})">
-                                                    <i class="fas fa-save"></i> Save Comment
-                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="workflow-button-container">
+                                            <button class="btn btn-info w-100 py-3" id="stepbystep-btn" onclick="showStepByStep()">
+                                                <i class="fas fa-stairs"></i><br>
+                                                <strong>Step by Step</strong>
+                                            </button>
+                                            <div class="loading-overlay" id="stepbystep-loading" style="display: none;">
+                                                <div class="loading-content">
+                                                    <div class="spinner-border text-light" role="status"></div>
+                                                    <p class="mt-2 text-light">Processing Step by Step...</p>
+                                                    <div class="progress mt-2" style="height: 6px;">
+                                                        <div class="progress-bar bg-light" id="stepbystep-progress" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="workflow-button-container">
+                                            <button class="btn btn-success w-100 py-3" id="report-btn" onclick="showReport()">
+                                                <i class="fas fa-file-alt"></i><br>
+                                                <strong>Report</strong>
+                                            </button>
+                                            <div class="loading-overlay" id="report-loading" style="display: none;">
+                                                <div class="loading-content">
+                                                    <div class="spinner-border text-light" role="status"></div>
+                                                    <p class="mt-2 text-light">Generating Report...</p>
+                                                    <div class="progress mt-2" style="height: 6px;">
+                                                        <div class="progress-bar bg-light" id="report-progress" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="workflow-button-container">
+                                            <button class="btn btn-warning w-100 py-3" id="review-compare-btn" onclick="showReviewAndCompare()">
+                                                <i class="fas fa-search-plus"></i><br>
+                                                <strong>Review & Compare</strong>
+                                            </button>
+                                            <div class="loading-overlay" id="review-compare-loading" style="display: none;">
+                                                <div class="loading-content">
+                                                    <div class="spinner-border text-light" role="status"></div>
+                                                    <p class="mt-2 text-light">Processing Review...</p>
+                                                    <div class="progress mt-2" style="height: 6px;">
+                                                        <div class="progress-bar bg-light" id="review-compare-progress" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> <strong>AI Output Available</strong>
-                                <div class="mt-3">
-                                    <h6>Raw AI Breakdown:</h6>
-                                    <div class="bg-light p-3 rounded border" style="max-height: 400px; overflow-y: auto;">
-                                        {% if breakdown.raw_breakdown %}
-                                            {{ breakdown.raw_breakdown|linebreaks }}
-                                        {% else %}
-                                            <p class="text-muted">No AI breakdown content available. The document may still be processing or there was an issue with the AI generation.</p>
-                                        {% endif %}
+
+                            </div>
+                            
+
+                            
+                            <!-- Content Display Area -->
+                            <div id="content-display" class="content-display">
+                                <!-- Content will be loaded here based on button clicks -->
+                                <div class="text-center text-muted py-5">
+                                    <i class="fas fa-hand-pointer fa-3x mb-3"></i>
+                                    <h5>Select a workflow option above to get started</h5>
+                                    <p>Choose from Breakdown, Step by Step, Report, or Review & Compare</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Workflow Content Sections -->
+                            <div id="workflow-sections" style="display: none;">
+                                <!-- Breakdown Section -->
+                                <div class="workflow-section mb-4" id="breakdown-section" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-list-ul"></i> AI Breakdown
+                                            </h6>
+                                            <div class="d-flex align-items-center">
+                                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSectionMinimize('breakdown')" id="breakdown-minimize-btn">
+                                                    <i class="fas fa-minus" id="breakdown-minimize-icon"></i>
+                                                    <span id="breakdown-minimize-text">Minimize</span>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('breakdown')" id="breakdown-edit-btn">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success me-2" onclick="saveSectionContent('breakdown')" id="breakdown-save-btn" style="display: none;">
+                                                    <i class="fas fa-save"></i> Save
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="regenerateSection('breakdown')" id="breakdown-regenerate-btn">
+                                                    <i class="fas fa-sync-alt"></i> Regenerate
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body" id="breakdown-content">
+
+                                            
+                                            <div class="section-display" id="breakdown-display">
+                                                {% if breakdown.content.sections %}
+                                                    <div class="breakdown-sections">
+                                                        <h6><i class="fas fa-list-ul"></i> Document Breakdown Analysis</h6>
+                                                        {% for section in breakdown.content.sections %}
+                                                            <div class="breakdown-section-item mb-4" data-section-id="{{ forloop.counter }}" data-section-title="{{ section.title|escapejs }}" data-section-content="{{ section.content|escapejs }}">
+                                                                <div class="section-header d-flex justify-content-between align-items-center">
+                                                                    <h6 class="section-title">
+                                                                        <i class="fas fa-chevron-right text-primary"></i>
+                                                                        {{ section.title }}
+                                                                    </h6>
+                                                                    <div class="section-actions">
+                                                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('{{ forloop.counter }}', '{{ section.title|escapejs }}', '{{ section.content|escapejs }}')">
+                                                                            <i class="fas fa-edit"></i> Edit
+                                                                        </button>
+                                                                        <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt({{ forloop.counter }}, '{{ section.title|escapejs }}', '{{ section.content|escapejs }}')">
+                                                                            <i class="fas fa-stairs"></i> Step by Step
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="section-content">
+                                                                    {{ section.content|linebreaks }}
+                                                                    <div class="subsection-buttons mt-3" id="subsection-buttons-{{ forloop.counter }}">
+                                                                        <!-- Subsection buttons will be generated here by JavaScript -->
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    
+
+                                                {% else %}
+                                                    <p>Breakdown content will be displayed here...</p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="section-editor" id="breakdown-editor" style="display: none;">
+                                                <textarea class="form-control" id="breakdown-editor-text" rows="15" placeholder="Enter breakdown content..."></textarea>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="mt-3">
-                                    <button class="btn btn-primary" onclick="regenerateBreakdown()">
-                                        <i class="fas fa-sync-alt"></i> Regenerate Breakdown
-                                    </button>
+                                
+                                <!-- Step by Step Section -->
+                                <div class="workflow-section mb-4" id="stepbystep-section" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-stairs"></i> Step by Step Analysis
+                                            </h6>
+                                            <div class="d-flex align-items-center">
+                                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSectionMinimize('stepbystep')" id="stepbystep-minimize-btn">
+                                                    <i class="fas fa-minus" id="stepbystep-minimize-icon"></i>
+                                                    <span id="stepbystep-minimize-text">Minimize</span>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('stepbystep')" id="stepbystep-edit-btn">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success me-2" onclick="saveSectionContent('stepbystep')" id="stepbystep-save-btn" style="display: none;">
+                                                    <i class="fas fa-save"></i> Save
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="regenerateSection('stepbystep')" id="stepbystep-regenerate-btn">
+                                                    <i class="fas fa-sync-alt"></i> Regenerate
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body" id="stepbystep-content">
+
+                                            
+                                            <div class="section-display" id="stepbystep-display">
+                                                {% if breakdown.content.sections %}
+                                                    <div class="stepbystep-content">
+                                                        <h6><i class="fas fa-stairs"></i> Complete Project Step-by-Step Guide</h6>
+
+                                                        <div class="stepbystep-sections">
+                                                            {% for section in breakdown.content.sections %}
+                                                                <div class="step-item mb-4" data-section-id="{{ forloop.counter }}" data-section-title="{{ section.title|escapejs }}" data-section-content="{{ section.content|escapejs }}">
+                                                                    <div class="step-header">
+                                                                        <div class="step-number">{{ forloop.counter }}</div>
+                                                                        <h6 class="step-title">
+                                                                            <i class="fas fa-arrow-right text-success"></i>
+                                                                            {{ section.title }}
+                                                                        </h6>
+                                                                        <button class="btn btn-sm btn-step-by-step ms-2" onclick="openCustomAIWithStepByStepPrompt({{ forloop.counter }}, '{{ section.title|escapejs }}', '{{ section.content|escapejs }}')">
+                                                                            <i class="fas fa-stairs"></i> Step by Step
+                                                                        </button>
+                                                                    </div>
+                                                                    <div class="step-content" id="step-content-{{ forloop.counter }}">
+                                                                        <div class="original-content" id="original-content-{{ forloop.counter }}">
+                                                                            {{ section.content|linebreaks }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                {% else %}
+                                                    <p>Step by step analysis will be displayed here...</p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="section-editor" id="stepbystep-editor" style="display: none;">
+                                                <textarea class="form-control" id="stepbystep-editor-text" rows="15" placeholder="Enter step by step analysis..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+                                
+                                <!-- Report Section -->
+                                <div class="workflow-section mb-4" id="report-section" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-file-alt"></i> Generated Report
+                                            </h6>
+                                            <div class="d-flex align-items-center">
+                                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSectionMinimize('report')" id="report-minimize-btn">
+                                                    <i class="fas fa-minus" id="report-minimize-icon"></i>
+                                                    <span id="report-minimize-text">Minimize</span>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('report')" id="report-edit-btn">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success me-2" onclick="saveSectionContent('report')" id="report-save-btn" style="display: none;">
+                                                    <i class="fas fa-save"></i> Save
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="regenerateSection('report')" id="report-regenerate-btn">
+                                                    <i class="fas fa-sync-alt"></i> Regenerate
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body" id="report-content">
+
+                                            
+                                            <div class="section-display" id="report-display">
+                                                {% if breakdown.content.sections %}
+                                                    <div class="report-content">
+                                                        <h6><i class="fas fa-file-alt"></i> Generated Report</h6>
+                                                        <div class="report-summary mb-3">
+                                                            <h6>Executive Summary</h6>
+                                                            <p>This report provides a comprehensive analysis of the document with {{ breakdown.content.sections|length }} key sections.</p>
+                                                        </div>
+                                                        <div class="report-sections">
+                                                            {% for section in breakdown.content.sections %}
+                                                                <div class="report-section mb-3" data-section-id="{{ forloop.counter }}" data-section-title="{{ section.title|escapejs }}" data-section-content="{{ section.content|escapejs }}">
+                                                                    <div class="d-flex justify-content-between align-items-center">
+                                                                        <h6>{{ section.title }}</h6>
+                                                                        <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt({{ forloop.counter }}, '{{ section.title|escapejs }}', '{{ section.content|escapejs }}')">
+                                                                            <i class="fas fa-stairs"></i> Step by Step
+                                                                        </button>
+                                                                    </div>
+                                                                    <p>{{ section.content|truncatewords:50 }}</p>
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                {% else %}
+                                                    <p>Generated report will be displayed here...</p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="section-editor" id="report-editor" style="display: none;">
+                                                <textarea class="form-control" id="report-editor-text" rows="15" placeholder="Enter report content..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Review & Compare Section -->
+                                <div class="workflow-section mb-4" id="review-compare-section">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-search-plus"></i> Review & Compare
+                                            </h6>
+                                            <div class="d-flex align-items-center">
+                                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSectionMinimize('review-compare')" id="review-compare-minimize-btn">
+                                                    <i class="fas fa-minus" id="review-compare-minimize-icon"></i>
+                                                    <span id="review-compare-minimize-text">Minimize</span>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('review-compare')" id="review-compare-edit-btn">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success me-2" onclick="saveSectionContent('review-compare')" id="review-compare-save-btn" style="display: none;">
+                                                    <i class="fas fa-save"></i> Save
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="regenerateSection('review-compare')" id="review-compare-regenerate-btn">
+                                                    <i class="fas fa-sync-alt"></i> Regenerate
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body" id="review-compare-content">
+
+                                            
+                                            <div class="section-display" id="review-compare-display">
+                                                {% if breakdown.content.sections %}
+                                                    <div class="review-compare-content">
+                                                        <h6><i class="fas fa-search-plus"></i> Review & Comparison</h6>
+                                                        <div class="quality-assessment mb-3">
+                                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                <h6>Quality Assessment</h6>
+                                                                <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(0, 'Review & Analysis', '{{ breakdown.content.sections|safe|escapejs }}')">
+                                                                    <i class="fas fa-stairs"></i> Step by Step
+                                                                </button>
+                                                            </div>
+                                                            <div class="assessment-grid">
+                                                                <div class="assessment-item">
+                                                                    <strong>Content Quality:</strong> 
+                                                                    <span class="badge bg-success">High</span>
+                                                                </div>
+                                                                <div class="assessment-item">
+                                                                    <strong>Structure:</strong> 
+                                                                    <span class="badge bg-info">Good</span>
+                                                                </div>
+                                                                <div class="assessment-item">
+                                                                    <strong>Completeness:</strong> 
+                                                                    <span class="badge bg-warning">85%</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="comparison-analysis">
+                                                            <h6>Analysis Summary</h6>
+                                            <p>Document contains {{ breakdown.content.sections|length }} well-structured sections with comprehensive coverage of key topics.</p>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <p>Review and comparison tools will be displayed here...</p>
+                                {% endif %}
+                            </div>
+                                            <div class="section-editor" id="review-compare-editor" style="display: none;">
+                                                <textarea class="form-control" id="review-compare-editor-text" rows="15" placeholder="Enter review and comparison content..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <script>
+                                function toggleTextEdit() {
+                                    const display = document.getElementById('text-display');
+                                    const editor = document.getElementById('text-editor');
+                                    const content = document.getElementById('text-content');
+                                    
+                                    if (editor.style.display === 'none') {
+                                        content.style.display = 'none';
+                                        editor.style.display = 'block';
+                                    } else {
+                                        content.style.display = 'block';
+                                        editor.style.display = 'none';
+                                    }
+                                }
+                                
+                                function toggleTextMinimize() {
+                                    const textDisplay = document.getElementById('text-display');
+                                    const minimizeBtn = document.getElementById('minimize-btn');
+                                    const minimizeIcon = document.getElementById('minimize-icon');
+                                    const minimizeText = document.getElementById('minimize-text');
+                                    
+                                    if (textDisplay.classList.contains('minimized')) {
+                                        // Expand
+                                        textDisplay.classList.remove('minimized');
+                                        minimizeIcon.className = 'fas fa-minus';
+                                        minimizeText.textContent = 'Minimize';
+                                        minimizeBtn.classList.remove('btn-outline-success');
+                                        minimizeBtn.classList.add('btn-outline-secondary');
+                                    } else {
+                                        // Minimize
+                                        textDisplay.classList.add('minimized');
+                                        minimizeIcon.className = 'fas fa-plus';
+                                        minimizeText.textContent = 'Expand';
+                                        minimizeBtn.classList.remove('btn-outline-secondary');
+                                        minimizeBtn.classList.add('btn-outline-success');
+                                    }
+                                }
+                                
+                                function saveTextChanges() {
+                                    const newText = document.getElementById('editable-text').value;
+                                    
+                                    // Send AJAX request to save changes
+                                    fetch('{% url "breakdown:save_extracted_text" breakdown.document.id %}', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                        },
+                                        body: JSON.stringify({
+                                            extracted_text: newText
+                                        })
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            document.getElementById('text-content').innerHTML = newText.replace(/\n/g, '<br>');
+                                            toggleTextEdit();
+                                            // Show success message
+                                            alert('Text changes saved successfully!');
+                                        } else {
+                                            alert('Error saving changes: ' + data.error);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error:', error);
+                                        alert('Error saving changes');
+                                    });
+                                }
+                                
+                                function cancelTextEdit() {
+                                    // Reset text to original content
+                                    document.getElementById('editable-text').value = `{{ document.extracted_text|escapejs }}`;
+                                    toggleTextEdit();
+                                }
+                                
+                                function showBreakdown() {
+                                    showLoading('breakdown');
+                                    loadContent('breakdown');
+                                }
+                                
+                                function showStepByStep() {
+                                    showLoading('stepbystep');
+                                    loadContent('step-by-step');
+                                }
+                                
+                                function showReport() {
+                                    showLoading('report');
+                                    loadContent('report');
+                                }
+                                
+                                function showReviewAndCompare() {
+                                    showLoading('review-compare');
+                                    loadContent('review-compare');
+                                }
+                                
+                                function showLoading(type) {
+                                    // Hide the button and show loading overlay
+                                    const button = document.getElementById(`${type}-btn`);
+                                    const loading = document.getElementById(`${type}-loading`);
+                                    const progressBar = document.getElementById(`${type}-progress`);
+                                    
+                                    if (button && loading && progressBar) {
+                                        button.style.display = 'none';
+                                        loading.style.display = 'block';
+                                        
+                                        // Animate progress bar
+                                        let progress = 0;
+                                        const interval = setInterval(() => {
+                                            progress += Math.random() * 15;
+                                            if (progress > 90) progress = 90;
+                                            progressBar.style.width = progress + '%';
+                                        }, 200);
+                                        
+                                        // Store interval ID to clear later
+                                        loading.dataset.interval = interval;
+                                    }
+                                }
+                                
+                                function hideLoading(type) {
+                                    const button = document.getElementById(`${type}-btn`);
+                                    const loading = document.getElementById(`${type}-loading`);
+                                    const progressBar = document.getElementById(`${type}-progress`);
+                                    
+                                    if (button && loading && progressBar) {
+                                        // Clear progress interval
+                                        if (loading.dataset.interval) {
+                                            clearInterval(parseInt(loading.dataset.interval));
+                                        }
+                                        
+                                        // Complete progress bar
+                                        progressBar.style.width = '100%';
+                                        
+                                        // Hide loading after a short delay
+                                        setTimeout(() => {
+                                            button.style.display = 'block';
+                                            loading.style.display = 'none';
+                                            progressBar.style.width = '0%';
+                                        }, 500);
+                                    }
+                                }
+                                
+                                function loadContent(type) {
+                                    // Show the workflow sections
+                                    const workflowSections = document.getElementById('workflow-sections');
+                                    workflowSections.style.display = 'block';
+                                    
+                                    // Show both breakdown and step-by-step sections when step-by-step is selected
+                                    if (type === 'step-by-step') {
+                                        // Show breakdown section if it has content
+                                        const breakdownSection = document.getElementById('breakdown-section');
+                                        if (breakdownSection) {
+                                            breakdownSection.style.display = 'block';
+                                        }
+                                        
+                                        // Show step-by-step section
+                                        const stepbystepSection = document.getElementById('stepbystep-section');
+                                        if (stepbystepSection) {
+                                            stepbystepSection.style.display = 'block';
+                                        }
+                                        
+                                        // Hide other sections
+                                        const reportSection = document.getElementById('report-section');
+                                        const reviewSection = document.getElementById('review-compare-section');
+                                        if (reportSection) reportSection.style.display = 'none';
+                                        if (reviewSection) reviewSection.style.display = 'none';
+                                    } else if (type === 'report') {
+                                        // For report, show both breakdown and report sections
+                                        const breakdownSection = document.getElementById('breakdown-section');
+                                        const reportSection = document.getElementById('report-section');
+                                        
+                                        if (breakdownSection) {
+                                            breakdownSection.style.display = 'block';
+                                        }
+                                        if (reportSection) {
+                                            reportSection.style.display = 'block';
+                                        }
+                                        
+                                        // Hide other sections
+                                        const stepbystepSection = document.getElementById('stepbystep-section');
+                                        const reviewSection = document.getElementById('review-compare-section');
+                                        if (stepbystepSection) stepbystepSection.style.display = 'none';
+                                        if (reviewSection) reviewSection.style.display = 'none';
+                                    } else {
+                                        // For other types, show only the selected section
+                                        const allSections = document.querySelectorAll('.workflow-section');
+                                        allSections.forEach(section => {
+                                            section.style.display = 'none';
+                                        });
+                                        
+                                        let sectionId = '';
+                                        switch(type) {
+                                            case 'breakdown':
+                                                sectionId = 'breakdown-section';
+                                                break;
+                                            case 'review-compare':
+                                                sectionId = 'review-compare-section';
+                                                break;
+                                        }
+                                        
+                                        if (sectionId) {
+                                            const selectedSection = document.getElementById(sectionId);
+                                            if (selectedSection) {
+                                                selectedSection.style.display = 'block';
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Show the AI processing loading view
+                                    showAIProcessingView(type);
+                                }
+                                
+                                function showAIProcessingView(workflowType) {
+                                    // Get the section that should show the loading view
+                                    let sectionId = '';
+                                    switch(workflowType) {
+                                        case 'breakdown':
+                                            sectionId = 'breakdown-section';
+                                            break;
+                                        case 'step-by-step':
+                                            sectionId = 'stepbystep-section';
+                                            break;
+                                        case 'report':
+                                            sectionId = 'report-section';
+                                            break;
+                                        case 'review-compare':
+                                            sectionId = 'review-compare-section';
+                                            break;
+                                    }
+                                    
+                                    if (sectionId) {
+                                        const section = document.getElementById(sectionId);
+                                        const display = document.getElementById(`${sectionId.replace('-section', '')}-display`);
+                                        
+                                        if (section && display) {
+                                            // Show the loading view
+                                            display.innerHTML = `
+                                                <div class="ai-processing-view">
+                                                    <div class="loading-spinner"></div>
+                                                    <h4>Processing with AI</h4>
+                                                    <p class="status-message">This may take a few moments depending on the document size...</p>
+                                                    
+                                                    <div class="step-indicator">
+                                                        <div class="step active" id="ai-step1">
+                                                            <i class="fas fa-paper-plane"></i><br>
+                                                            Sent to AI
+                                                        </div>
+                                                        <div class="step" id="ai-step2">
+                                                            <i class="fas fa-brain"></i><br>
+                                                            AI Analyzing
+                                                        </div>
+                                                        <div class="step" id="ai-step3">
+                                                            <i class="fas fa-check"></i><br>
+                                                            Content Ready
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="progress-bar">
+                                                        <div class="progress-fill" id="ai-progressFill"></div>
+                                                    </div>
+                                                    
+                                                    <div id="ai-statusMessage" class="status-message">Initializing AI processing...</div>
+                                                    <div class="model-info">
+                                                        <i class="fas fa-info-circle"></i> Using AI model: {{ breakdown.ai_model_used|default:"Default Model" }}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            
+                                            // Start the AI processing progress animation
+                                            startAIProgress();
+                                            
+                                            // Call the AI API after showing the loading view
+                                            setTimeout(() => {
+                                                callAIWorkflow(workflowType);
+                                            }, 1000);
+                                        }
+                                    }
+                                }
+                                
+                                function startAIProgress() {
+                                    updateAIStep(1);
+                                    updateAIProgress(0);
+                                    updateAIStatus('Sending document to AI...');
+                                    
+                                    // Start real-time progress monitoring
+                                    startProgressMonitoring();
+                                }
+                                
+                                function startProgressMonitoring() {
+                                    let progress = 0;
+                                    let step = 1;
+                                    
+                                    const progressInterval = setInterval(() => {
+                                        progress += Math.random() * 15; // Random progress increment
+                                        
+                                        if (progress >= 100) {
+                                            progress = 100;
+                                            clearInterval(progressInterval);
+                                        }
+                                        
+                                        updateAIProgress(progress);
+                                        
+                                        // Update steps based on progress
+                                        if (progress > 30 && step === 1) {
+                                            step = 2;
+                                            updateAIStep(2);
+                                            updateAIStatus('AI is analyzing your document...');
+                                        } else if (progress > 70 && step === 2) {
+                                            step = 3;
+                                            updateAIStep(3);
+                                            updateAIStatus('AI analysis in progress...');
+                                        }
+                                    }, 500); // Update every 500ms for smooth progress
+                                }
+                                
+                                function updateAIStep(stepNumber) {
+                                    // Remove active class from all AI steps
+                                    document.querySelectorAll('#ai-step1, #ai-step2, #ai-step3').forEach(step => {
+                                        step.classList.remove('active');
+                                    });
+                                    
+                                    // Add active class to current step
+                                    document.getElementById(`ai-step${stepNumber}`).classList.add('active');
+                                }
+                                
+                                function updateAIProgress(percentage) {
+                                    const progressFill = document.getElementById('ai-progressFill');
+                                    if (progressFill) {
+                                        progressFill.style.width = percentage + '%';
+                                    }
+                                }
+                                
+                                function updateAIStatus(message) {
+                                    const statusMessage = document.getElementById('ai-statusMessage');
+                                    if (statusMessage) {
+                                        statusMessage.textContent = message;
+                                    }
+                                }
+                                
+                                function checkIfAIContentExists() {
+                                    // Check if any AI-generated content is actually visible
+                                    const breakdownDisplay = document.getElementById('breakdown-display');
+                                    const stepbystepDisplay = document.getElementById('stepbystep-display');
+                                    const reportDisplay = document.getElementById('report-display');
+                                    
+                                    return (breakdownDisplay && breakdownDisplay.innerHTML.trim() !== '') ||
+                                           (stepbystepDisplay && stepbystepDisplay.innerHTML.trim() !== '') ||
+                                           (reportDisplay && reportDisplay.innerHTML.trim() !== '');
+                                }
+                                
+                                function callAIWorkflowWithContent(workflowType, content, sectionId = null) {
+                                    const breakdownId = {{ breakdown.id }};
+                                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                                    
+                                    fetch(`/breakdown/${breakdownId}/run-ai-workflow/`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': csrfToken,
+                                        },
+                                        body: JSON.stringify({
+                                            workflow_type: workflowType,
+                                            current_content: content
+                                        })
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            if (sectionId && workflowType === 'stepbystep') {
+                                                // Update specific section's step-by-step content
+                                                updateSectionStepByStep(sectionId, data.breakdown);
+                                            } else {
+                                                // Update the content with AI results
+                                                updateSectionContent(workflowType, data.breakdown);
+                                            }
+                                            showNotification(data.message, 'success');
+                                        } else {
+                                            showNotification('AI processing failed: ' + data.error, 'error');
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error:', error);
+                                            showNotification('Failed to connect to AI service', 'error');
+                                    })
+                                    .finally(() => {
+                                        // Hide loading state for the button
+                                        if (sectionId) {
+                                            // Re-enable the convert button for this section
+                                            const stepContent = document.getElementById(`step-content-${sectionId}`);
+                                            const convertBtn = stepContent.parentElement.querySelector('button[onclick*="processSectionToStepByStep"]');
+                                            convertBtn.disabled = false;
+                                            convertBtn.innerHTML = '<i class="fas fa-magic"></i> Convert to Steps';
+                                        } else {
+                                            // Hide loading state for the button
+                                            const buttonType = workflowType.replace('-', '');
+                                            hideLoading(buttonType);
+                                        }
+                                    });
+                                }
+                                
+                                function openCustomAI(sectionType) {
+                                    // Get the content from the specified section
+                                    let content = '';
+                                    let sectionName = '';
+                                    
+                                    if (sectionType === 'extracted') {
+                                        content = document.querySelector('#text-content').textContent.trim();
+                                        sectionName = 'Extracted Text';
+                                    } else if (sectionType === 'breakdown') {
+                                        const breakdownDisplay = document.getElementById('breakdown-display');
+                                        if (breakdownDisplay) {
+                                            content = breakdownDisplay.textContent.trim();
+                                        }
+                                        sectionName = 'Breakdown';
+                                    } else if (sectionType === 'stepbystep') {
+                                        const stepbystepDisplay = document.getElementById('stepbystep-display');
+                                        if (stepbystepDisplay) {
+                                            content = stepbystepDisplay.textContent.trim();
+                                        }
+                                        sectionName = 'Step by Step';
+                                    } else if (sectionType === 'report') {
+                                        const reportDisplay = document.getElementById('report-display');
+                                        if (reportDisplay) {
+                                            content = reportDisplay.textContent.trim();
+                                        }
+                                        sectionName = 'Report';
+                                    }
+                                    
+                                    if (content) {
+                                        // Encode content and section name for URL parameters
+                                        const encodedContent = encodeURIComponent(content);
+                                        const encodedSectionName = encodeURIComponent(sectionName);
+                                        
+                                        // Open custom AI page with content
+                                        window.open(`/customai/?content=${encodedContent}&section=${encodedSectionName}`, '_blank');
+                                    } else {
+                                        showNotification('No content available for Custom AI analysis', 'error');
+                                    }
+                                }
+                                
+
+                                
+                                // Add event listeners for the interface
+// This is now handled in the main DOMContentLoaded event listener above
+
+                                // Sidebar Functions
+                                function loadFullExtractedText() {
+                                    const fullText = `{{ document.extracted_text|escapejs }}`;
+                                    document.getElementById('sidebar-text-content').value = fullText;
+                                    showNotification('Document text loaded! You can now edit or modify it.', 'success');
+                                }
+
+                                function openCustomAIWithPrompt() {
+                                    const text = document.getElementById('sidebar-text-content').value.trim();
+                                    const prompt = document.getElementById('sidebar-prompt').value.trim();
+                                    
+                                    if (!text) {
+                                        showNotification('Please copy and paste some text to analyze!', 'error');
+                                        return;
+                                    }
+                                    
+                                    if (!prompt) {
+                                        showNotification('Please enter a prompt for the AI!', 'error');
+                                        return;
+                                    }
+                                    
+                                    // Combine content and prompt for the custom AI interface
+                                    const combinedContent = `Content: ${text}\n\nAI Prompt: ${prompt}`;
+                                    
+                                    // Open custom AI page with combined content and prompt
+                                    const encodedContent = encodeURIComponent(combinedContent);
+                                    const encodedSectionName = encodeURIComponent('Custom AI Analysis');
+                                    
+                                    window.open(`/customai/?content=${encodedContent}&section=${encodedSectionName}`, '_blank');
+                                }
+
+                                function openCustomAIForReview() {
+                                    const text = document.getElementById('sidebar-text-content').value.trim();
+                                    
+                                    if (!text) {
+                                        showNotification('Please copy and paste some text to review!', 'error');
+                                        return;
+                                    }
+                                    
+                                    // Create a review prompt
+                                    const reviewPrompt = 'Please review and analyze this content. Provide insights, identify key points, and suggest improvements.';
+                                    const combinedContent = `Content: ${text}\n\nAI Prompt: ${reviewPrompt}`;
+                                    
+                                    // Open custom AI page for review
+                                    const encodedContent = encodeURIComponent(combinedContent);
+                                    const encodedSectionName = encodeURIComponent('AI Review & Analysis');
+                                    
+                                    window.open(`/customai/?content=${encodedContent}&section=${encodedSectionName}`, '_blank');
+                                }
+                                
+                                function callAIWorkflow(workflowType) {
+                                    const breakdownId = {{ breakdown.id }};
+                                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                                    
+                                    // Get the current content based on workflow type
+                                    let currentContent = '';
+                                    if (workflowType === 'breakdown') {
+                                        // For initial breakdown, use extracted text
+                                        currentContent = document.querySelector('#text-content').textContent.trim();
+                                    } else {
+                                        // For other workflows, get content from the appropriate section
+                                        const sectionId = workflowType === 'step-by-step' ? 'stepbystep' : workflowType;
+                                        const displayElement = document.getElementById(`${sectionId}-display`);
+                                        if (displayElement) {
+                                            currentContent = displayElement.textContent.trim();
+                                        }
+                                    }
+                                    
+                                    // If no content found, fall back to extracted text
+                                    if (!currentContent) {
+                                        currentContent = document.querySelector('#text-content').textContent.trim();
+                                    }
+                                    
+                                    console.log(`Starting AI workflow: ${workflowType}`);
+                                    console.log(`Content length: ${currentContent.length}`);
+                                    console.log(`Breakdown ID: ${breakdownId}`);
+                                    
+                                    fetch(`/breakdown/${breakdownId}/run-ai-workflow/`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': csrfToken,
+                                        },
+                                        body: JSON.stringify({
+                                            workflow_type: workflowType,
+                                            current_content: currentContent
+                                        })
+                                    })
+                                    .then(response => {
+                                        console.log(`Response status: ${response.status}`);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        console.log('AI response data:', data);
+                                        if (data.success) {
+                                            // Update the content with AI results
+                                            updateSectionContent(workflowType, data.breakdown);
+                                            showNotification(data.message, 'success');
+                                        } else {
+                                            console.error('AI processing failed:', data.error);
+                                            showNotification('AI processing failed: ' + data.error, 'error');
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error in AI workflow:', error);
+                                        showNotification('Failed to connect to AI service: ' + error.message, 'error');
+                                    })
+                                    .finally(() => {
+                                        // Hide loading state for the button
+                                        const buttonType = workflowType.replace('-', '');
+                                        hideLoading(buttonType);
+                                    });
+                                }
+                                
+                                function updateSectionContent(workflowType, breakdownData) {
+                                    // Update the section content with AI results
+                                    const sectionId = workflowType === 'step-by-step' ? 'stepbystep' : workflowType;
+                                    const displayElement = document.getElementById(`${sectionId}-display`);
+                                    
+                                    if (displayElement && breakdownData) {
+                                        // For step-by-step, we want to show the breakdown content in the AI analyzer
+                                        // and create simplified steps based on it
+                                        if (workflowType === 'step-by-step') {
+                                            // Get the breakdown content to show in AI analyzer
+                                            const breakdownDisplay = document.getElementById('breakdown-display');
+                                            let breakdownContent = '';
+                                            if (breakdownDisplay) {
+                                                breakdownContent = breakdownDisplay.innerHTML;
+                                            }
+                                            
+                                            // Create simplified step-by-step content
+                                            const newContent = formatAIResponse(workflowType, breakdownData);
+                                            
+                                            // Show breakdown in AI analyzer and simplified steps below
+                                            displayElement.innerHTML = `
+                                                <div class="ai-analyzer-section mb-4">
+                                                    <div class="alert alert-primary">
+                                                        <i class="fas fa-brain"></i>
+                                                        <strong>AI Analyzer - Processing Breakdown Content:</strong>
+                                                    </div>
+                                                    <div class="breakdown-content-preview">
+                                                        <div class="analyzer-status">
+                                                            <i class="fas fa-check-circle text-success"></i>
+                                                            <span class="ms-2">Analysis Complete - Breakdown content processed</span>
+                                                        </div>
+                                                        ${breakdownContent}
+                                                    </div>
+                                                </div>
+                                                <hr class="my-4">
+                                                <div class="simplified-steps">
+                                                    <h6 class="text-info mb-3">
+                                                        <i class="fas fa-stairs"></i> Simplified Action Steps
+                                                    </h6>
+                                                    ${newContent}
+                                                </div>
+                                            `;
+                                        } else {
+                                            // For other workflows, preserve existing content and add new AI results
+                                            const existingContent = displayElement.innerHTML;
+                                            const newContent = formatAIResponse(workflowType, breakdownData);
+                                            
+                                            // Create a new content section that preserves the old content
+                                            displayElement.innerHTML = `
+                                                <div class="content-history mb-4">
+                                                    <div class="alert alert-info">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        <strong>Previous Content:</strong> This content was generated from the previous AI analysis.
+                                                    </div>
+                                                    ${existingContent}
+                                                </div>
+                                                <hr class="my-4">
+                                                <div class="new-ai-content">
+                                                    <h6 class="text-success mb-3">
+                                                        <i class="fas fa-plus-circle"></i> New AI-Generated Content
+                                                    </h6>
+                                                    ${newContent}
+                                                </div>
+                                            `;
+                                        }
+                                        
+                                        // Now that content is actually displayed, update AI status to "ready"
+                                        if (checkIfAIContentExists()) {
+                                            updateAIStatus('AI analysis complete! Content ready.');
+                                            updateAIStep(3); // Set to final step
+                                            updateAIProgress(100); // Set progress to 100%
+                                            
+                                            // Generate subsection buttons for the new content
+                                            setTimeout(() => {
+                                                generateSubsectionButtons();
+                                            }, 100);
+                                            
+                                            // Show success notification
+                                            showNotification('AI analysis completed successfully!', 'success');
+                                        } else {
+                                            updateAIStatus('AI analysis complete but no content to display.');
+                                        }
+                                    }
+                                }
+                                
+                                function formatAIResponse(workflowType, breakdownData) {
+                                    // Format the AI response based on workflow type
+                                    if (workflowType === 'breakdown') {
+                                        // Create a nice breakdown with sections
+                                        let breakdownHTML = `<div class="breakdown-content">
+                                            <h6><i class="fas fa-list-ul"></i> AI-Generated Breakdown</h6>
+                                            <div class="breakdown-sections">`;
+                                        
+                                        if (breakdownData.sections && breakdownData.sections.length > 0) {
+                                            breakdownData.sections.forEach((section, index) => {
+                                                // Clean up the content by removing markdown formatting
+                                                let cleanContent = section.content || section;
+                                                if (typeof cleanContent === 'string') {
+                                                    // Remove markdown formatting
+                                                    cleanContent = cleanContent
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                                                        .replace(/"(.*?)"/g, '<em>"$1"</em>')
+                                                        .replace(/\n/g, '<br>');
+                                                }
+                                                
+                                                breakdownHTML += `
+                                                    <div class="breakdown-section-item mb-4" data-section-id="${index + 1}" data-section-title="${section.title || `Section ${index + 1}`}" data-section-content="${cleanContent}">
+                                                        <div class="section-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="section-title">
+                                                                <i class="fas fa-chevron-right text-primary"></i>
+                                                                ${section.title || `Section ${index + 1}`}
+                                                            </h6>
+                                                            <div class="section-actions">
+                                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('${index + 1}', '${section.title || `Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                                <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(${index + 1}, '${section.title || `Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-stairs"></i> Step by Step
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="section-content">
+                                                            ${cleanContent}
+                                                            <div class="subsection-buttons mt-3" id="subsection-buttons-${index + 1}">
+                                                                <!-- Subsection buttons will be generated here by JavaScript -->
+                                                            </div>
+                                                        </div>
+                                                    </div>`;
+                                            });
+                                        } else {
+                                            breakdownHTML += '<p class="text-muted">No breakdown data available</p>';
+                                        }
+                                        
+                                        // Add workflow buttons at the bottom
+                                        breakdownHTML += `
+                                            </div>
+                                            <div class="workflow-actions mt-4 text-center">
+                                                <button class="btn btn-success me-2" onclick="saveDocument('breakdown', 'pdf')">
+                                                    <i class="fas fa-save"></i> Save as PDF
+                                                </button>
+                                                <button class="btn btn-success me-2" onclick="saveDocument('breakdown', 'docx')">
+                                                    <i class="fas fa-save"></i> Save as Word
+                                                </button>
+                                            </div>
+                                        </div>`;
+                                        
+                                        return breakdownHTML;
+                                        
+                                    } else if (workflowType === 'step-by-step') {
+                                        // Create simplified, actionable steps based on breakdown content
+                                        let stepByStepHTML = `<div class="stepbystep-content">
+                                            <h6><i class="fas fa-stairs"></i> Simplified Action Steps</h6>
+                                            <div class="stepbystep-sections">`;
+                                        
+                                        if (breakdownData.sections && breakdownData.sections.length > 0) {
+                                            breakdownData.sections.forEach((section, index) => {
+                                                let cleanContent = section.content || section;
+                                                if (typeof cleanContent === 'string') {
+                                                    cleanContent = cleanContent
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                                                        .replace(/"(.*?)"/g, '<em>"$1"</em>')
+                                                        .replace(/\n/g, '<br>');
+                                                }
+                                                
+                                                stepByStepHTML += `
+                                                    <div class="step-item mb-4" data-section-id="${index + 1}" data-section-title="${section.title || `Action ${index + 1}`}" data-section-content="${cleanContent}">
+                                                        <div class="step-header d-flex justify-content-between align-items-center">
+                                                            <div class="step-number">${index + 1}</div>
+                                                            <h6 class="step-title">
+                                                                <i class="fas fa-arrow-right text-success"></i>
+                                                                ${section.title || `Action ${index + 1}`}
+                                                            </h6>
+                                                            <div class="section-actions">
+                                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('${index + 1}', '${section.title || `Action ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                                <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(${index + 1}, '${section.title || `Action ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-stairs"></i> Step by Step
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="step-content">
+                                                            <div class="action-step">
+                                                                <div class="action-icon">
+                                                                    <i class="fas fa-play-circle text-primary"></i>
+                                                                </div>
+                                                                <div class="action-text">
+                                                                    ${cleanContent}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>`;
+                                            });
+                                        } else {
+                                            stepByStepHTML += '<p class="text-muted">No step-by-step data available</p>';
+                                        }
+                                        
+                                        // Add workflow buttons at the bottom
+                                        stepByStepHTML += `
+                                            </div>
+                                        </div>`;
+                                        
+                                        return stepByStepHTML;
+                                        
+                                    } else if (workflowType === 'report') {
+                                        let reportHTML = `<div class="report-content">
+                                            <h6><i class="fas fa-file-alt"></i> Comprehensive AI-Generated Report</h6>
+                                            <div class="report-sections">`;
+                                        
+                                        if (breakdownData.sections && breakdownData.sections.length > 0) {
+                                            breakdownData.sections.forEach((section, index) => {
+                                                let cleanContent = section.content || section;
+                                                if (typeof cleanContent === 'string') {
+                                                    cleanContent = cleanContent
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                                                        .replace(/"(.*?)"/g, '<em>"$1"</em>')
+                                                        .replace(/\n/g, '<br>');
+                                                }
+                                                
+                                                reportHTML += `
+                                                    <div class="report-section-item mb-4" data-section-id="${index + 1}" data-section-title="${section.title || `Report Section ${index + 1}`}" data-section-content="${cleanContent}">
+                                                        <div class="section-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="section-title">
+                                                                <i class="fas fa-file-text text-success"></i>
+                                                                ${section.title || `Report Section ${index + 1}`}
+                                                            </h6>
+                                                            <div class="section-actions">
+                                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('${index + 1}', '${section.title || `Report Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                                <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(${index + 1}, '${section.title || `Report Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-stairs"></i> Step by Step
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="section-content">
+                                                            ${cleanContent}
+                                                            <div class="subsection-buttons mt-3" id="subsection-buttons-${index + 1}">
+                                                                <!-- Subsection buttons will be generated here by JavaScript -->
+                                                            </div>
+                                                        </div>
+                                                    </div>`;
+                                            });
+                                        } else {
+                                            reportHTML += '<p class="text-muted">No report data available</p>';
+                                        }
+                                        
+                                        // Add workflow buttons at the bottom
+                                        reportHTML += `
+                                            </div>
+                                            <div class="workflow-actions mt-4 text-center">
+                                                <button class="btn btn-success me-2" onclick="saveDocument('report', 'pdf')">
+                                                    <i class="fas fa-save"></i> Save as PDF
+                                                </button>
+                                                <button class="btn btn-success me-2" onclick="saveDocument('report', 'docx')">
+                                                    <i class="fas fa-save"></i> Save as Word
+                                                </button>
+                                            </div>
+                                        </div>`;
+                                        
+                                        return reportHTML;
+                                        
+                                    } else if (workflowType === 'review-compare') {
+                                        let reviewHTML = `<div class="review-compare-content">
+                                            <h6><i class="fas fa-search-plus"></i> AI Review & Comparison Analysis</h6>
+                                            <div class="review-sections">`;
+                                        
+                                        if (breakdownData.sections && breakdownData.sections.length > 0) {
+                                            breakdownData.sections.forEach((section, index) => {
+                                                let cleanContent = section.content || section;
+                                                if (typeof cleanContent === 'string') {
+                                                    cleanContent = cleanContent
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                                                        .replace(/"(.*?)"/g, '<em>"$1"</em>')
+                                                        .replace(/\n/g, '<em>"$1"</em>')
+                                                        .replace(/\n/g, '<br>');
+                                                }
+                                                
+                                                reviewHTML += `
+                                                    <div class="review-section-item mb-4" data-section-id="${index + 1}" data-section-title="${section.title || `Review Section ${index + 1}`}" data-section-content="${cleanContent}">
+                                                        <div class="section-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="section-title">
+                                                                <i class="fas fa-search text-warning"></i>
+                                                                ${section.title || `Review Section ${index + 1}`}
+                                                            </h6>
+                                                            <div class="section-actions">
+                                                                <button class="btn btn-sm btn-outline-primary me-2" onclick="editSectionContent('${index + 1}', '${section.title || `Review Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                                <button class="btn btn-sm btn-step-by-step" onclick="openCustomAIWithStepByStepPrompt(${index + 1}, '${section.title || `Review Section ${index + 1}`}', '${cleanContent.replace(/'/g, "\\'")}')">
+                                                                    <i class="fas fa-stairs"></i> Step by Step
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="section-content">
+                                                            ${cleanContent}
+                                                            <div class="subsection-buttons mt-3" id="subsection-buttons-${index + 1}">
+                                                                <!-- Subsection buttons will be generated here by JavaScript -->
+                                                            </div>
+                                                        </div>
+                                                    </div>`;
+                                            });
+                                        } else {
+                                            reviewHTML += '<p class="text-muted">No review data available</p>';
+                                        }
+                                        
+                                        // Add workflow buttons at the bottom
+                                        reviewHTML += `
+                                            </div>
+                                        </div>`;
+                                        
+                                        return reviewHTML;
+                                    }
+                                    return 'Content not available';
+                                }
+                            </script>
+                            
+                        {% else %}
+                            <!-- Error or other status -->
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Breakdown status: {{ breakdown.status }}
                             </div>
                         {% endif %}
                     </div>
@@ -393,78 +2098,68 @@
             </div>
         </div>
 
-        <!-- Sidebar -->
+        <!-- Right Sidebar - Extracted Text and AI Interface -->
         <div class="col-lg-4">
-            <!-- Markers Panel -->
+            <!-- Extracted Text Input -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-info text-white">
                     <h6 class="mb-0">
-                        <i class="fas fa-map-marker-alt"></i> Markers & Comments
+                        <i class="fas fa-file-text"></i> Extracted Text
                     </h6>
                 </div>
                 <div class="card-body">
-                    <div id="markers-list" class="marker-list">
-                        <p class="text-muted">No markers added yet. Click on section numbers to add markers.</p>
+                    <div class="extracted-text-content">
+                        <textarea 
+                            id="sidebar-text-content" 
+                            class="form-control" 
+                            rows="8" 
+                            placeholder="Copy and paste your extracted text here..."
+                        ></textarea>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-primary w-100" onclick="loadFullExtractedText()">
+                                <i class="fas fa-download"></i> Load Document Text
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Custom Prompt Builder -->
+            <!-- Custom AI Prompt Interface -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-warning text-dark">
                     <h6 class="mb-0">
-                        <i class="fas fa-magic"></i> Custom AI Prompt Builder
+                        <i class="fas fa-magic"></i> Custom AI Prompt
                     </h6>
                 </div>
                 <div class="card-body">
-                    <div class="prompt-builder">
-                        <div class="mb-3">
-                            <label for="prompt-type" class="form-label">Prompt Type</label>
-                            <select class="form-select" id="prompt-type" onchange="updatePromptTemplate()">
-                                <option value="review">Review & Improve</option>
-                                <option value="expand">Expand Section</option>
-                                <option value="simplify">Simplify Content</option>
-                                <option value="custom">Custom Prompt</option>
-                            </select>
+                    <div class="form-group">
+                        <label for="sidebar-prompt" class="form-label">Your Prompt</label>
+                        <textarea 
+                            class="form-control" 
+                            id="sidebar-prompt" 
+                            rows="4" 
+                            placeholder="Enter your custom prompt for the AI..."
+                        ></textarea>
+                        <div class="mt-3">
+                            <button class="btn btn-warning w-100" onclick="openCustomAIWithPrompt()">
+                                <i class="fas fa-external-link-alt"></i> Open Custom AI
+                            </button>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="custom-prompt" class="form-label">Custom Prompt</label>
-                            <textarea class="form-control" id="custom-prompt" rows="4" 
-                                      placeholder="Enter your custom prompt for the AI..."></textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Prompt Preview</label>
-                            <div id="prompt-preview" class="prompt-preview"></div>
-                        </div>
-                        
-                        <button class="btn btn-warning w-100" onclick="sendCustomPrompt()">
-                            <i class="fas fa-paper-plane"></i> Send to AI
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Actions Panel -->
+            <!-- AI Review Button -->
             <div class="card shadow-sm">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-primary text-white">
                     <h6 class="mb-0">
-                        <i class="fas fa-cogs"></i> Actions
+                        <i class="fas fa-brain"></i> AI Review
                     </h6>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-outline-primary" onclick="exportBreakdown()">
-                            <i class="fas fa-download"></i> Export Breakdown
-                        </button>
-                        <button class="btn btn-outline-success" onclick="saveChanges()">
-                            <i class="fas fa-save"></i> Save Changes
-                        </button>
-                        <button class="btn btn-outline-info" onclick="regenerateWithComments()">
-                            <i class="fas fa-sync-alt"></i> Regenerate with Comments
-                        </button>
-                    </div>
+                    <button class="btn btn-primary w-100" onclick="openCustomAIForReview()">
+                        <i class="fas fa-search-plus"></i> Review with AI
+                    </button>
                 </div>
             </div>
         </div>
@@ -500,6 +2195,57 @@
         </div>
     </div>
 </div>
+
+<!-- Save Buttons Section -->
+<div class="save-section">
+    <h3>Save Documents</h3>
+    <div class="save-buttons">
+        <div class="save-group">
+            <h4>Save Breakdown</h4>
+            <div class="format-buttons">
+                <button class="btn btn-primary save-btn" 
+                        data-type="breakdown" 
+                        data-format="pdf">
+                    <i class="fas fa-file-pdf"></i> Save as PDF
+                </button>
+                <button class="btn btn-primary save-btn" 
+                        data-type="breakdown" 
+                        data-format="docx">
+                    <i class="fas fa-file-word"></i> Save as Word
+                </button>
+            </div>
+        </div>
+        
+        <div class="save-group">
+            <h4>Generate & Save Report</h4>
+            <div class="format-buttons">
+                <button class="btn btn-success save-btn" 
+                        data-type="report" 
+                        data-format="pdf">
+                    <i class="fas fa-file-pdf"></i> Save Report as PDF
+                </button>
+                <button class="btn btn-success save-btn" 
+                        data-type="report" 
+                        data-format="docx">
+                    <i class="fas fa-file-word"></i> Save Report as Word
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="save-status" id="saveStatus"></div>
+</div>
+
+<!-- Report Section -->
+<div class="report-section" id="reportSection" style="display: none;">
+    <h3>Comprehensive Report</h3>
+    <div class="report-content" id="reportContent">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Generating comprehensive report...</p>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -511,7 +2257,15 @@ let comments = {};
 document.addEventListener('DOMContentLoaded', function() {
     loadMarkers();
     loadComments();
-    updatePromptTemplate();
+    // updatePromptTemplate will be called after elements are created
+    
+    // Auto-show step by step content if breakdown data exists
+    autoShowStepByStep();
+    
+    // Generate subsection buttons for existing breakdown sections
+    setTimeout(() => {
+        generateSubsectionButtons();
+    }, 500);
 });
 
 function toggleMarkers() {
@@ -581,6 +2335,41 @@ function scrollToSection(sectionNumber) {
         section.scrollIntoView({ behavior: 'smooth' });
         section.classList.add('highlighted');
         setTimeout(() => section.classList.remove('highlighted'), 3000);
+    }
+}
+
+function autoShowStepByStep() {
+    // Check if there's breakdown content available
+    const breakdownContent = document.querySelector('#breakdown-display .breakdown-sections');
+    if (breakdownContent && breakdownContent.children.length > 0) {
+        // Show the workflow sections
+        const workflowSections = document.getElementById('workflow-sections');
+        if (workflowSections) {
+            workflowSections.style.display = 'block';
+        }
+        
+        // Show both breakdown and step-by-step sections
+        const breakdownSection = document.getElementById('breakdown-section');
+        const stepbystepSection = document.getElementById('stepbystep-section');
+        
+        if (breakdownSection) {
+            breakdownSection.style.display = 'block';
+        }
+        if (stepbystepSection) {
+            stepbystepSection.style.display = 'block';
+        }
+        
+        // Hide other sections
+        const reportSection = document.getElementById('report-section');
+        const reviewSection = document.getElementById('review-compare-section');
+        if (reportSection) reportSection.style.display = 'none';
+        if (reviewSection) reviewSection.style.display = 'none';
+        
+        // Hide the initial content display message
+        const contentDisplay = document.getElementById('content-display');
+        if (contentDisplay) {
+            contentDisplay.style.display = 'none';
+        }
     }
 }
 
@@ -796,6 +2585,915 @@ function loadComments() {
             }
         });
     }
+}
+
+
+
+// Edit section content function
+function editSectionContent(sectionId, sectionTitle, sectionContent) {
+    // Find the section element
+    const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+    if (!sectionElement) {
+        showNotification('Section not found', 'error');
+        return;
+    }
+    
+    // Get the content element
+    const contentElement = sectionElement.querySelector('.section-content');
+    if (!contentElement) {
+        showNotification('Content element not found', 'error');
+        return;
+    }
+    
+    // Store original content for cancel functionality
+    const originalContent = contentElement.innerHTML;
+    const originalTitle = sectionElement.querySelector('.section-title').innerHTML;
+    
+    // Create inline editor
+    const editorHTML = `
+        <div class="section-editor">
+            <div class="mb-3">
+                <label class="form-label">Section Title</label>
+                <input type="text" class="form-control" id="editSectionTitle-${sectionId}" value="${sectionTitle}" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Section Content</label>
+                <textarea class="form-control" id="editSectionContent-${sectionId}" rows="10" placeholder="Enter section content...">${sectionContent.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '')}</textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success btn-sm" onclick="saveSectionContentInline('${sectionId}')">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="cancelSectionEdit('${sectionId}', '${originalTitle.replace(/'/g, "\\'")}', '${originalContent.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Replace content with editor
+    contentElement.innerHTML = editorHTML;
+    
+    // Focus on the title input
+    setTimeout(() => {
+        const titleInput = document.getElementById(`editSectionTitle-${sectionId}`);
+        if (titleInput) titleInput.focus();
+    }, 100);
+}
+
+// Save section content inline function
+function saveSectionContentInline(sectionId) {
+    const newTitle = document.getElementById(`editSectionTitle-${sectionId}`).value;
+    const newContent = document.getElementById(`editSectionContent-${sectionId}`).value;
+    
+    if (!newTitle.trim() || !newContent.trim()) {
+        showNotification('Title and content cannot be empty', 'error');
+        return;
+    }
+    
+    // Get the breakdown ID from the URL
+    const breakdownId = getBreakdownIdFromUrl();
+    if (!breakdownId) {
+        showNotification('Could not determine breakdown ID', 'error');
+        return;
+    }
+    
+    // Show loading state
+    const saveBtn = document.querySelector(`#editSectionContent-${sectionId}`).closest('.section-editor').querySelector('.btn-success');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    saveBtn.disabled = true;
+    
+    // Make API call to save the section
+    fetch(`/breakdown/${breakdownId}/edit-section/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            section_id: sectionId,
+            title: newTitle,
+            content: newContent
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the section element
+            const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+            if (sectionElement) {
+                // Update the section title
+                const titleElement = sectionElement.querySelector('.section-title');
+                if (titleElement) {
+                    titleElement.innerHTML = `<i class="fas fa-chevron-right text-primary"></i> ${newTitle}`;
+                }
+                
+                // Update the section content
+                const contentElement = sectionElement.querySelector('.section-content');
+                if (contentElement) {
+                    // Create the new content with subsection buttons
+                    const newContentHTML = `
+                        ${newContent.replace(/\n/g, '<br>')}
+                        <div class="subsection-buttons mt-3" id="subsection-buttons-${sectionId}">
+                            <!-- Subsection buttons will be generated here by JavaScript -->
+                        </div>
+                    `;
+                    contentElement.innerHTML = newContentHTML;
+                }
+                
+                // Update data attributes
+                sectionElement.setAttribute('data-section-title', newTitle);
+                sectionElement.setAttribute('data-section-content', newContent);
+                
+                // Update onclick handlers for buttons
+                const stepByStepBtn = sectionElement.querySelector('.btn-step-by-step');
+                if (stepByStepBtn) {
+                    stepByStepBtn.onclick = () => openCustomAIWithStepByStepPrompt(sectionId, newTitle, newContent);
+                }
+                
+                const editBtn = sectionElement.querySelector('.btn-outline-primary');
+                if (editBtn) {
+                    editBtn.onclick = () => editSectionContent(sectionId, newTitle, newContent);
+                }
+                
+                // Regenerate subsection buttons
+                setTimeout(() => {
+                    generateSubsectionButtons();
+                }, 100);
+                
+                showNotification('Section updated successfully!', 'success');
+            }
+        } else {
+            showNotification('Failed to update section: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating section:', error);
+        showNotification('Failed to update section: ' + error.message, 'error');
+    })
+    .finally(() => {
+        // Reset button state
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    });
+}
+
+// Cancel section edit function
+function cancelSectionEdit(sectionId, originalTitle, originalContent) {
+    const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+    if (sectionElement) {
+        const contentElement = sectionElement.querySelector('.section-content');
+        if (contentElement) {
+            // Restore original content
+            contentElement.innerHTML = originalContent;
+        }
+        
+        // Restore original title
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (titleElement) {
+            titleElement.innerHTML = originalTitle;
+        }
+        
+        showNotification('Edit cancelled', 'info');
+    }
+}
+
+// This function has been replaced by saveSectionContentInline for better inline editing experience
+
+// Helper function to get breakdown ID from URL
+function getBreakdownIdFromUrl() {
+    const urlParts = window.location.pathname.split('/');
+    const breakdownIndex = urlParts.indexOf('breakdown');
+    if (breakdownIndex !== -1 && breakdownIndex + 1 < urlParts.length) {
+        return urlParts[breakdownIndex + 1];
+    }
+    return null;
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Save document function
+function saveDocument(documentType, fileFormat) {
+    const saveStatus = document.getElementById('saveStatus');
+    const saveBtn = event.target;
+    const originalText = saveBtn.innerHTML;
+    
+    // Show loading state
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    saveStatus.className = 'save-status info';
+    saveStatus.innerHTML = `Generating ${documentType} as ${fileFormat.toUpperCase()}...`;
+    saveStatus.style.display = 'block';
+    
+    // Prepare data for saving
+    const data = {
+        document_type: documentType,
+        file_format: fileFormat
+    };
+    
+    // Make API call to save document
+    fetch(`/breakdown/save_document/${breakdownId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            saveStatus.className = 'save-status success';
+            saveStatus.innerHTML = `
+                <i class="fas fa-check-circle"></i> 
+                ${data.message}
+                ${data.download_url ? `<br><a href="${data.download_url}" class="btn btn-sm btn-outline-success mt-2">Download File</a>` : ''}
+            `;
+            
+            // If it's a report, also show the report content
+            if (documentType === 'report') {
+                showReportSection();
+            }
+        } else {
+            saveStatus.className = 'save-status error';
+            saveStatus.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${data.error}`;
+        }
+    })
+    .catch(error => {
+        saveStatus.className = 'save-status error';
+        saveStatus.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${error.message}`;
+    })
+    .finally(() => {
+        // Reset button state
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    });
+}
+
+// Show report section
+function showReportSection() {
+    const reportSection = document.getElementById('reportSection');
+    const reportContent = document.getElementById('reportContent');
+    
+    reportSection.style.display = 'block';
+    
+    // Generate report content if not already generated
+    if (reportContent.querySelector('.loading-spinner')) {
+        generateReport();
+    }
+}
+
+// Generate comprehensive report
+function generateReport() {
+    const reportContent = document.getElementById('reportContent');
+    
+    // Show loading
+    reportContent.innerHTML = `
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Generating comprehensive report...</p>
+        </div>
+    `;
+    
+    // Get breakdown data
+    const breakdownData = window.breakdownData || {};
+    const extractedText = window.extractedText || '';
+    
+    // Make API call to generate report
+    fetch(`/breakdown/generate_report/${breakdownId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            extracted_text: extractedText,
+            breakdown_content: JSON.stringify(breakdownData)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayReport(data.report);
+        } else {
+            reportContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    Error generating report: ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        reportContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i> 
+                Error: ${error.message}
+            </div>
+        `;
+    });
+}
+
+// Display the generated report
+function displayReport(reportData) {
+    const reportContent = document.getElementById('reportContent');
+    
+    let html = '';
+    
+    if (reportData.sections && reportData.sections.length > 0) {
+        reportData.sections.forEach((section, index) => {
+            html += `
+                <div class="section">
+                    <h4>${section.title || `Section ${index + 1}`}</h4>
+                    <div class="content">
+                        ${section.content || ''}
+                    </div>
+                    ${section.images && section.images.length > 0 ? 
+                        section.images.map(img => `
+                            <div class="image-placeholder">
+                                <i class="fas fa-image"></i>
+                                <p><strong>Image Placeholder:</strong> ${img.name}</p>
+                                <p><em>${img.description || 'Image description will be added here'}</em></p>
+                            </div>
+                        `).join('') : ''
+                    }
+                    ${section.references && section.references.length > 0 ? 
+                        section.references.map(ref => `
+                            <div class="reference">
+                                <strong>Reference:</strong> ${ref}
+                            </div>
+                        `).join('') : ''
+                    }
+                </div>
+            `;
+        });
+    } else {
+        html = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                No report sections available. Please try generating the report again.
+            </div>
+        `;
+    }
+    
+    reportContent.innerHTML = html;
+}
+
+// Event listeners for save buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const saveButtons = document.querySelectorAll('.save-btn');
+    
+    saveButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const documentType = this.dataset.type;
+            const fileFormat = this.dataset.format;
+            saveDocument(documentType, fileFormat);
+        });
+    });
+});
+
+// Generate subsection buttons for breakdown sections
+function generateSubsectionButtons() {
+    const breakdownSections = document.querySelectorAll('.breakdown-section-item');
+    
+    breakdownSections.forEach((section, index) => {
+        const subsectionButtonsContainer = section.querySelector('.subsection-buttons');
+        if (!subsectionButtonsContainer) return;
+        
+        const sectionContent = section.querySelector('.section-content');
+        const contentText = sectionContent.textContent || sectionContent.innerText;
+        
+        // Check if content contains numbered subsections (like 1.1, 1.2, etc.)
+        const subsectionPattern = /\d+\.\d+/g;
+        const subsections = contentText.match(subsectionPattern);
+        
+        if (subsections && subsections.length > 0) {
+            // Get unique subsection numbers (e.g., 1.1, 1.2, 1.3 -> 1)
+            const uniqueSections = [...new Set(subsections.map(sub => sub.split('.')[0]))];
+            
+            let buttonsHTML = '<h6 class="text-muted mb-2"><i class="fas fa-list-ol"></i> Individual Subsection Analysis:</h6>';
+            buttonsHTML += '<div class="subsection-grid">';
+            
+            uniqueSections.forEach(sectionNum => {
+                // Find all subsections for this section number
+                const sectionSubsections = subsections.filter(sub => sub.startsWith(sectionNum + '.'));
+                
+                if (sectionSubsections.length > 0) {
+                    const sectionTitle = section.querySelector('.section-title').textContent.trim();
+                    const sectionId = section.getAttribute('data-section-id');
+                    
+                    buttonsHTML += `
+                        <button class="btn btn-sm btn-outline-primary me-2 mb-2" 
+                                onclick="openCustomAIWithStepByStepPrompt('${sectionId}', '${sectionTitle} - Section ${sectionNum}', '${contentText.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-stairs"></i> Section ${sectionNum} (${sectionSubsections.length} subsections)
+                        </button>
+                    `;
+                }
+            });
+            
+            buttonsHTML += '</div>';
+            subsectionButtonsContainer.innerHTML = buttonsHTML;
+        }
+    });
+}
+
+// AI Section Processing Functions
+function updateSectionStepByStep(sectionId, aiResult) {
+    const processedSteps = document.getElementById(`processed-steps-${sectionId}`);
+    const convertBtn = document.querySelector(`[data-section-id="${sectionId}"] button[onclick*="processSectionToStepByStep"]`);
+    const contentToggle = document.getElementById(`content-toggle-${sectionId}`);
+    
+    if (processedSteps && aiResult && aiResult.sections && aiResult.sections.length > 0) {
+        // Format the AI response into a nice step-by-step display
+        let stepsHTML = '<div class="step-by-step-guide">';
+        
+        aiResult.sections.forEach((section, index) => {
+            stepsHTML += `
+                <div class="step-guide-item mb-3">
+                    <h6 class="step-guide-title">
+                        <i class="fas fa-play-circle text-primary"></i>
+                        ${section}
+                    </h6>
+                </div>
+            `;
+        });
+        
+        // If there's raw response content, add it as well
+        if (aiResult.raw_response) {
+            stepsHTML += `
+                <div class="detailed-steps mt-3">
+                    <h6><i class="fas fa-info-circle text-info"></i> Detailed Instructions</h6>
+                    <div class="steps-content">
+                        ${aiResult.raw_response.replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        stepsHTML += '</div>';
+        
+        processedSteps.innerHTML = stepsHTML;
+        
+        // Show the content toggle buttons
+        if (contentToggle) {
+            contentToggle.style.display = 'block';
+        }
+        
+        // Show success message
+        showNotification(`Section ${sectionId} converted to step-by-step guide successfully!`, 'success');
+    } else {
+        // Fallback if AI response format is unexpected
+        processedSteps.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Step-by-Step Guide Generated</strong><br>
+                The AI has processed this section and created a simplified guide. 
+                You can now follow the step-by-step instructions to complete this task.
+            </div>
+        `;
+        
+        // Show the content toggle buttons
+        if (contentToggle) {
+            contentToggle.style.display = 'block';
+        }
+    }
+}
+
+function toggleContentDisplay(sectionId, displayType) {
+    const originalContent = document.getElementById(`original-content-${sectionId}`);
+    const processedSteps = document.getElementById(`processed-steps-${sectionId}`);
+    
+    if (displayType === 'original') {
+        originalContent.style.display = 'block';
+        processedSteps.style.display = 'none';
+    } else if (displayType === 'steps') {
+        originalContent.style.display = 'none';
+        processedSteps.style.display = 'block';
+    }
+}
+
+function processAllSectionsToStepByStep() {
+    const sections = document.querySelectorAll('.step-item');
+    const processAllBtn = document.querySelector('button[onclick="processAllSectionsToStepByStep()"]');
+    
+    if (sections.length === 0) {
+        showNotification('No sections found to process', 'error');
+        return;
+    }
+    
+    // Disable the button and show processing state
+    processAllBtn.disabled = true;
+    processAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing All Sections...';
+    
+    let processedCount = 0;
+    const totalSections = sections.length;
+    
+    // Process each section sequentially to avoid overwhelming the AI service
+    sections.forEach((section, index) => {
+        const sectionId = section.getAttribute('data-section-id');
+        const sectionTitle = section.getAttribute('data-section-title');
+        const sectionContent = section.getAttribute('data-section-content');
+        
+        // Add a small delay between requests to be respectful to the AI service
+        setTimeout(() => {
+            processSectionToStepByStep(sectionId, sectionTitle, sectionContent);
+            processedCount++;
+            
+            // Update progress
+            if (processedCount === totalSections) {
+                processAllBtn.disabled = false;
+                processAllBtn.innerHTML = '<i class="fas fa-magic"></i> Convert All Sections to Step-by-Step Guides';
+                showNotification(`All ${totalSections} sections have been processed!`, 'success');
+            }
+        }, index * 2000); // 2 second delay between each section
+    });
+}
+
+function processSectionToStepByStep(sectionId, sectionTitle, sectionContent) {
+    const stepContent = document.getElementById(`step-content-${sectionId}`);
+    const originalContent = stepContent.querySelector('.original-content');
+    const processedSteps = stepContent.querySelector(`#processed-steps-${sectionId}`);
+    const convertBtn = stepContent.parentElement.querySelector('button[onclick*="processSectionToStepByStep"]');
+    
+    // Show loading state
+    processedSteps.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Processing...</span>
+            </div>
+            <p class="mt-2">Converting "${sectionTitle}" to step-by-step guide...</p>
+        </div>
+    `;
+    processedSteps.style.display = 'block';
+    originalContent.style.display = 'none';
+    
+    // Disable the convert button
+    convertBtn.disabled = true;
+    convertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    // Prepare the prompt for AI processing
+    const prompt = `Convert the following content into a simple, practical "how to do it" step-by-step guide with clear explanations:
+
+Title: ${sectionTitle}
+
+Content: ${sectionContent}
+
+Please provide:
+1. A clear overview of what this section covers
+2. Step-by-step instructions that are easy to follow
+3. Explanations for each step
+4. Any important notes or tips
+5. Expected outcomes
+
+Format the response in a clear, structured way that someone can follow to complete the task.`;
+    
+    // Call the AI workflow to process this section
+    callAIWorkflowWithContent('stepbystep', prompt, sectionId);
+}
+
+// Section Management Functions
+function toggleSectionMinimize(sectionType) {
+    const section = document.getElementById(`${sectionType}-section`);
+    const minimizeBtn = document.getElementById(`${sectionType}-minimize-btn`);
+    const minimizeIcon = document.getElementById(`${sectionType}-minimize-icon`);
+    const minimizeText = document.getElementById(`${sectionType}-minimize-text`);
+    
+    if (section.classList.contains('minimized')) {
+        // Expand
+        section.classList.remove('minimized');
+        minimizeIcon.className = 'fas fa-minus';
+        minimizeText.textContent = 'Minimize';
+        minimizeBtn.className = 'btn btn-sm btn-outline-secondary me-2';
+    } else {
+        // Minimize
+        section.classList.add('minimized');
+        minimizeIcon.className = 'fas fa-plus';
+        minimizeText.textContent = 'Expand';
+        minimizeBtn.className = 'btn btn-sm btn-outline-success me-2';
+    }
+}
+
+function editSectionContent(sectionType) {
+    const display = document.getElementById(`${sectionType}-display`);
+    const editor = document.getElementById(`${sectionType}-editor`);
+    const editBtn = document.getElementById(`${sectionType}-edit-btn`);
+    const saveBtn = document.getElementById(`${sectionType}-save-btn`);
+    
+    // Get current content and put it in editor
+    const editorText = document.getElementById(`${sectionType}-editor-text`);
+    editorText.value = display.innerHTML;
+    
+    // Show editor, hide display
+    display.style.display = 'none';
+    editor.style.display = 'block';
+    
+    // Show save button, hide edit button
+    editBtn.style.display = 'none';
+    saveBtn.style.display = 'inline-block';
+}
+
+function saveSectionContent(sectionType) {
+    const display = document.getElementById(`${sectionType}-display`);
+    const editor = document.getElementById(`${sectionType}-editor`);
+    const editBtn = document.getElementById(`${sectionType}-edit-btn`);
+    const saveBtn = document.getElementById(`${sectionType}-save-btn`);
+    
+    // Get edited content
+    const editorText = document.getElementById(`${sectionType}-editor-text`);
+    const newContent = editorText.value;
+    
+    // Update display with new content
+    display.innerHTML = newContent;
+    
+    // Show display, hide editor
+    display.style.display = 'block';
+    editor.style.display = 'none';
+    
+    // Show edit button, hide save button
+    editBtn.style.display = 'inline-block';
+    saveBtn.style.display = 'none';
+    
+    // Show success message
+    showNotification('Content saved successfully!', 'success');
+}
+
+function regenerateSection(sectionType) {
+    if (confirm(`This will regenerate the ${sectionType.replace('-', ' ')} section. Continue?`)) {
+        const display = document.getElementById(`${sectionType}-display`);
+        
+        // Show processing state
+        display.innerHTML = `
+            <div class="text-center py-3">
+                <div class="spinner-border text-warning" role="status">
+                    <span class="visually-hidden">Regenerating...</span>
+                </div>
+                <p class="mt-2">Regenerating ${sectionType.replace('-', ' ')} section...</p>
+            </div>
+        `;
+        
+        // Simulate regeneration time
+        setTimeout(() => {
+            // Generate new content based on section type
+            let newContent = '';
+            switch(sectionType) {
+                case 'breakdown':
+                    newContent = `Regenerated AI breakdown analysis. This provides a fresh comprehensive breakdown of the content with updated insights and analysis points.`;
+                    break;
+                case 'stepbystep':
+                    newContent = `Regenerated step-by-step analysis. This provides a fresh logical breakdown of the content into sequential steps with detailed explanations.`;
+                    break;
+                case 'report':
+                    newContent = `Regenerated report. This provides a fresh structured summary with updated key findings and recommendations.`;
+                    break;
+                case 'review-compare':
+                    newContent = `Regenerated review and comparison. This includes fresh quality assessment and comparison to standards.`;
+                    break;
+            }
+            
+            // Update display
+            display.innerHTML = newContent;
+            
+            // Show success message
+            showNotification(`${sectionType.replace('-', ' ')} section regenerated successfully!`, 'success');
+        }, 2000);
+    }
+}
+
+// Notification function for internal workflow
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Initialize missing elements for prompt template functionality
+function initializePromptTemplateElements() {
+    // Create missing elements if they don't exist
+    if (!document.getElementById('prompt-type')) {
+        const promptTypeSelect = document.createElement('select');
+        promptTypeSelect.id = 'prompt-type';
+        promptTypeSelect.className = 'form-select form-select-sm';
+        promptTypeSelect.innerHTML = `
+            <option value="review">Review & Improve</option>
+            <option value="expand">Expand Section</option>
+            <option value="simplify">Simplify Content</option>
+            <option value="custom">Custom Prompt</option>
+        `;
+        
+        // Add event listener
+        promptTypeSelect.addEventListener('change', updatePromptTemplate);
+        
+        // Insert into the page if there's a suitable location
+        const sidebar = document.querySelector('.col-lg-4');
+        if (sidebar) {
+            const promptCard = document.createElement('div');
+            promptCard.className = 'card shadow-sm mb-3';
+            promptCard.innerHTML = `
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-edit"></i> Prompt Template
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="prompt-type" class="form-label">Prompt Type</label>
+                        ${promptTypeSelect.outerHTML}
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="custom-prompt" class="form-label">Custom Prompt</label>
+                        <textarea class="form-control" id="custom-prompt" rows="4" 
+                                  placeholder="Enter your custom prompt..."></textarea>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label class="form-label">Preview</label>
+                        <div id="prompt-preview" class="prompt-preview"></div>
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-secondary w-100" onclick="sendCustomPrompt()">
+                            <i class="fas fa-paper-plane"></i> Send Prompt
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Insert after the first card
+            const firstCard = sidebar.querySelector('.card');
+            if (firstCard) {
+                firstCard.parentNode.insertBefore(promptCard, firstCard.nextSibling);
+            }
+        }
+    }
+}
+
+// Function to send custom prompt
+function sendCustomPrompt() {
+    const customPrompt = document.getElementById('custom-prompt').value;
+    if (!customPrompt.trim()) {
+        alert('Please enter a custom prompt');
+        return;
+    }
+    
+    // Get the current breakdown ID from the URL or page data
+    const breakdownId = window.breakdownId || getBreakdownIdFromUrl();
+    if (!breakdownId) {
+        alert('Could not determine breakdown ID');
+        return;
+    }
+    
+    // Send the custom prompt to the backend
+    fetch(`/breakdown/${breakdownId}/custom_prompt/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            prompt: customPrompt
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Custom prompt sent successfully!');
+            // Optionally refresh the page or update content
+            location.reload();
+        } else {
+            alert('Error sending prompt: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error sending prompt. Please try again.');
+    });
+}
+
+// Helper function to get breakdown ID from URL
+function getBreakdownIdFromUrl() {
+    const urlParts = window.location.pathname.split('/');
+    const breakdownIndex = urlParts.indexOf('breakdown');
+    if (breakdownIndex !== -1 && breakdownIndex + 1 < urlParts.length) {
+        return urlParts[breakdownIndex + 1];
+    }
+    return null;
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+initializePromptTemplateElements();
+
+// Custom AI Integration Functions
+function openCustomAIWithStepByStepPrompt(sectionId, sectionTitle, sectionContent) {
+    // Handle the case where sectionContent might be a JSON string of sections
+    let processedContent = sectionContent;
+    
+    // If this is the Review & Analysis section (sectionId === 0), try to parse sections
+    if (sectionId === 0 && sectionTitle === 'Review & Analysis') {
+        try {
+            // Try to parse the content as JSON (sections data)
+            const sections = JSON.parse(sectionContent);
+            if (Array.isArray(sections)) {
+                // Extract content from each section and join them
+                processedContent = sections.map(section => {
+                    if (typeof section === 'object' && section.content) {
+                        return section.content;
+                    } else if (typeof section === 'string') {
+                        return section;
+                    }
+                    return '';
+                }).filter(content => content.trim()).join('\n\n');
+            }
+        } catch (e) {
+            // If parsing fails, use the content as-is
+            console.log('Could not parse sections JSON, using content as-is');
+        }
+    }
+    
+    // Create a comprehensive step-by-step breakdown prompt with simplification instructions
+    const stepByStepPrompt = `I need you to simplify the following text. Break it down into clear, easy-to-understand instructions, with each part explained step-by-step. Here's how you should approach the simplification:
+
+SECTION: ${sectionTitle}
+
+CONTENT: ${processedContent}
+
+**Simplification Approach:**
+
+1. **Identify Key Concepts**: Identify the main ideas and important points in the text. Extract the core message that needs to be conveyed.
+
+2. **Split Complex Sentences**: Break long, complex sentences into shorter, simpler ones. If there are any technical or difficult terms, explain them in plain language.
+
+3. **Use Everyday Language**: Replace jargon, technical terms, or complicated words with simpler synonyms. Make the explanation sound conversational, as if explaining it to someone who has no prior knowledge.
+
+4. **Step-by-Step Instructions**: Organize the explanation into clear, logical steps. Each step should be its own instruction, starting with simple actions and moving towards more complex ones as needed. Label each step (e.g., Step 1, Step 2) to create a sequence.
+
+5. **Use Visual Cues**: Where applicable, include things like bullet points, numbered lists, or subheadings to guide the reader. This makes it easier to follow and ensures clarity.
+
+6. **Include Examples or Analogies**: If the text describes a concept that may be abstract or difficult to grasp, provide a simple example or analogy that makes it easier to understand.
+
+7. **Clarify with Visuals**: If there are processes that benefit from visuals, describe how they can be represented, or suggest what kind of image or diagram would make the steps clearer.
+
+8. **Ensure Accessibility**: Ensure the language is easy for all audiences to understand. Assume the reader has minimal background knowledge, and keep it as simple and approachable as possible.
+
+**Final Requirements:**
+- Check that the instructions flow logically from one step to the next
+- The final result should be something that anyone can follow, regardless of their expertise in the subject matter
+- Provide a clear, structured breakdown that transforms complex information into simple, actionable steps
+- Include practical examples and analogies where helpful
+- Use clear headings and formatting to improve readability`;
+    
+    // Encode the content and prompt for URL parameters
+    const encodedContent = encodeURIComponent(processedContent);
+    const encodedPrompt = encodeURIComponent(stepByStepPrompt);
+    const encodedSectionName = encodeURIComponent(`Step-by-Step Guide: ${sectionTitle}`);
+    
+    // Open custom AI page with pre-filled content and prompt
+    window.open(`/customai/?content=${encodedContent}&prompt=${encodedPrompt}&section=${encodedSectionName}`, '_blank');
+    
+    // Show notification
+    showNotification(`Opening Custom AI for "${sectionTitle}" step-by-step guide`, 'info');
 }
 </script>
 {% endblock %} 

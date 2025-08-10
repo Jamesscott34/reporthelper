@@ -84,10 +84,16 @@
                                 <td>{{ document.uploaded_at|date:"M d, Y H:i" }}</td>
                                 <td>
                                     <div class="btn-group" role="group">
+                                        {% if document.breakdowns.exists %}
+                                            <a href="{% url 'breakdown:breakdown_viewer' breakdown_id=document.breakdowns.first.id %}" 
+                                               class="btn btn-sm btn-outline-success" title="View Full Content">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        {% endif %}
                                         {% if document.status == 'completed' and document.breakdowns.exists %}
                                             <a href="{% url 'breakdown:breakdown_detail' breakdown_id=document.breakdowns.first.id %}" 
                                                class="btn btn-sm btn-outline-primary" title="View Breakdown">
-                                                <i class="fas fa-eye"></i>
+                                                <i class="fas fa-list-ul"></i> Breakdown
                                             </a>
                                         {% endif %}
                                         {% if document.is_original %}

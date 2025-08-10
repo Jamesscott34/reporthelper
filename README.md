@@ -68,10 +68,10 @@ AI Report Writer is a modular platform that:
 3. **Run the enhanced setup script**
    ```bash
    # Make setup script executable
-   chmod +x setup.sh
+   chmod +x scripts/setup.sh
    
    # Run setup (handles everything automatically)
-   ./setup.sh
+   ./scripts/setup.sh
    ```
 
 4. **Automatic Startup Features**
@@ -95,6 +95,40 @@ If you need to start services manually:
 
 # Check status
 ./scripts/status.sh
+```
+
+## 📁 Project Structure
+
+```
+Report_AI/
+├── 📁 ai_report_writer/          # Main Django application
+├── 📁 breakdown/                  # Document breakdown functionality
+├── 📁 comparison_ai/              # AI comparison features
+├── 📁 creation/                   # Document creation tools
+├── 📁 user_review/                # User review system
+├── 📁 breakdown_review/           # Breakdown review functionality
+├── 📁 prompts/                    # AI prompt templates
+├── 📁 static/                     # Static files (CSS, JS, images)
+├── 📁 templates/                  # HTML templates
+├── 📁 media/                      # User uploaded files
+├── 📁 java_assets/                # Java document generator
+├── 📁 docs/                       # Documentation files
+│   ├── DOCUMENT_GENERATION_README.md
+│   ├── MODEL_MANAGEMENT_README.md
+│   ├── WINDOWS_SETUP.md
+│   └── OPENROUTE_SETUP.md
+├── 📁 scripts/                    # Utility and startup scripts
+│   ├── start.sh                   # Main startup script
+│   ├── start.bat                  # Windows startup script
+│   ├── start_simple.ps1           # PowerShell startup script
+│   ├── switch_model.py            # AI model switcher
+│   ├── start_django.sh            # Django server starter
+│   ├── status.sh                  # System status checker
+│   └── ...                        # Other utility scripts
+├── 📄 README.md                   # This file
+├── 📄 requirements.txt            # Python dependencies
+├── 📄 manage.py                   # Django management
+└── 📄 .env                        # Environment configuration
 ```
 
 ## 🔄 Automatic Updates

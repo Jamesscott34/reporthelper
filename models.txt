@@ -1,0 +1,83 @@
+AVAILABLE AI MODELS FOR OPENROUTER
+====================================
+
+PREMIUM MODELS (High Performance, Most Reliable)
+------------------------------------------------
+- openai/gpt-4o                    # Most advanced GPT model
+- anthropic/claude-3.5-sonnet      # Excellent reasoning
+- openai/gpt-4o-mini              # Reliable, good performance
+- google/gemini-2.5-pro           # Good performance, reliable
+- anthropic/claude-3.5-haiku      # Fast and reliable
+
+STANDARD MODELS (Good Performance, Reliable)
+--------------------------------------------
+- openai/gpt-3.5-turbo            # Very reliable, cost-effective
+- mistralai/mistral-large          # Good reasoning, reliable
+- anthropic/claude-3-haiku         # Fast and reliable
+- google/gemini-2.0-flash          # Good performance
+- cohere/command-r-plus            # Reliable alternative
+
+FREE MODELS (Basic Performance, Less Reliable)
+---------------------------------------------
+- mistralai/mistral-small          # Free, basic performance
+- qwen/qwen3-8b                    # Free alternative
+- meta-llama/llama-3.1-8b-instruct # Free alternative
+- deepseek/deepseek-chat           # Alternative DeepSeek model
+- deepseek/deepseek-v3-base        # Another DeepSeek option
+
+LEGACY MODELS (Current Configuration)
+------------------------------------
+- deepseek/deepseek-r1-0528-qwen3-8b:free
+- tngtech/deepseek-r1t2-chimera:free
+- openrouter/horizon-beta
+
+RECOMMENDED MODEL ORDER FOR EACH TASK:
+======================================
+
+BREAKDOWN TASK:
+1. openai/gpt-4o (most reliable)
+2. anthropic/claude-3.5-sonnet
+3. openai/gpt-4o-mini
+4. openai/gpt-3.5-turbo (fallback)
+5. mistralai/mistral-small (free)
+
+REVIEWER TASK:
+1. openai/gpt-4o (best reasoning)
+2. anthropic/claude-3.5-sonnet
+3. openai/gpt-3.5-turbo
+4. mistralai/mistral-large
+5. mistralai/mistral-small (free)
+
+FINALIZER TASK:
+1. openai/gpt-4o (best quality)
+2. anthropic/claude-3.5-sonnet
+3. openai/gpt-4o-mini
+4. openai/gpt-3.5-turbo
+5. mistralai/mistral-small (free)
+
+REANALYZER TASK:
+1. openai/gpt-4o (best analysis)
+2. anthropic/claude-3.5-sonnet
+3. openai/gpt-4o-mini
+4. openai/gpt-3.5-turbo
+5. mistralai/mistral-small (free)
+
+USAGE NOTES:
+============
+- Premium models cost more but are most reliable
+- Standard models offer good balance of cost/reliability
+- Free models may have infrastructure issues
+- System automatically tries models in order of preference
+- If one model fails, it automatically switches to the next
+- Legacy models are kept for backward compatibility
+
+TO CHANGE MODELS:
+=================
+1. Update environment variables:
+   BREAKDOWN_MODEL=openai/gpt-4o
+   REVIEWER_MODEL=anthropic/claude-3.5-sonnet
+   FINALIZER_MODEL=openai/gpt-4o-mini
+
+2. Or update the model_config.py file directly
+
+3. Restart the application after changes

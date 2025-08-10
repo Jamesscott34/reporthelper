@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <!-- ====================================================================== -->
+    <!-- PROJECT METADATA                                                       -->
+    <!-- ====================================================================== -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Project identification and basic information -->
+    <groupId>com.reportai</groupId>
+    <artifactId>document-generator</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <!-- Project name and description -->
+    <name>Document Generator</name>
+    <description>
+        Java application for generating professional PDF and Word documents from text content.
+        This application is part of the Report AI system and provides high-quality document
+        generation capabilities using iText for PDFs and Apache POI for Word documents.
+        
+        Features:
+        - PDF generation with professional formatting
+        - Word document (DOCX) creation with consistent styling
+        - Automatic section header detection and formatting
+        - Professional typography and spacing
+        - Cross-platform compatibility
+        - UTF-8 text encoding support
+    </description>
+
+    <!-- Project organization and contact information -->
+    <organization>
+        <name>Report AI System</name>
+        <url>https://github.com/reportai/document-generator</url>
+    </organization>
+
+    <!-- ====================================================================== -->
+    <!-- PROJECT PROPERTIES                                                    -->
+    <!-- ====================================================================== -->
+    <properties>
+        <!-- Java version requirements -->
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        
+        <!-- Project encoding and build settings -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        
+        <!-- Dependency versions for easy management -->
+        <itext.version>5.5.13.3</itext.version>
+        <poi.version>5.2.3</poi.version>
+        
+        <!-- Build plugin versions -->
+        <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
+        <maven.shade.plugin.version>3.4.1</maven.shade.plugin.version>
+    </properties>
+
+    <!-- ====================================================================== -->
+    <!-- DEPENDENCIES                                                          -->
+    <!-- ====================================================================== -->
+    <dependencies>
+        
+        <!-- ================================================================== -->
+        <!-- PDF GENERATION DEPENDENCIES                                        -->
+        <!-- ================================================================== -->
+        
+        <!-- iText PDF Library - Core PDF generation capabilities -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itextpdf</artifactId>
+            <version>${itext.version}</version>
+            <description>
+                Core iText library for PDF generation. Provides:
+                - Document creation and manipulation
+                - Font management and text rendering
+                - Page layout and formatting
+                - Professional PDF output
+                
+                Version 5.5.13.3 is a stable, mature version with:
+                - Excellent performance and memory efficiency
+                - Comprehensive font support
+                - Professional typography capabilities
+                - Wide compatibility with PDF standards
+            </description>
+        </dependency>
+        
+        <!-- ================================================================== -->
+        <!-- WORD DOCUMENT DEPENDENCIES                                         -->
+        <!-- ================================================================== -->
+        
+        <!-- Apache POI - Core library for Microsoft Office file formats -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>${poi.version}</version>
+            <description>
+                Core Apache POI library for Microsoft Office file formats.
+                Provides the foundation for reading and writing Office documents.
+                
+                Features:
+                - Support for OLE2 format (legacy Office files)
+                - Basic document structure handling
+                - Cross-platform compatibility
+                - Memory-efficient processing
+            </description>
+        </dependency>
+        
+        <!-- Apache POI OOXML - Modern Office Open XML format support -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
+            <description>
+                Apache POI OOXML module for modern Office Open XML formats.
+                Enables creation and manipulation of DOCX files (Word 2007+).
+                
+                Capabilities:
+                - DOCX file format support
+                - Modern XML-based document structure
+                - Enhanced formatting and styling options
+                - Better compatibility with current Office versions
+            </description>
+        </dependency>
+        
+        <!-- Apache POI OOXML Schemas - XML schema definitions -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml-schemas</artifactId>
+            <version>${poi.version}</version>
+            <description>
+                XML schema definitions for Office Open XML formats.
+                Provides validation and structure for OOXML documents.
+                
+                Benefits:
+                - Document structure validation
+                - Schema-aware processing
+                - Standards compliance
+                - Error detection and prevention
+            </description>
+        </dependency>
+        
+        <!-- Apache POI Scratchpad - Additional format support -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
+            <version>${poi.version}</version>
+            <description>
+                Additional format support and utilities for Apache POI.
+                Extends core functionality with additional features.
+                
+                Includes:
+                - Additional file format handlers
+                - Utility classes and helpers
+                - Extended formatting options
+                - Enhanced compatibility features
+            </description>
+        </dependency>
+        
+    </dependencies>
+
+    <!-- ====================================================================== -->
+    <!-- BUILD CONFIGURATION                                                   -->
+    <!-- ====================================================================== -->
+    <build>
+        
+        <!-- ================================================================== -->
+        <!-- PLUGINS                                                            -->
+        <!-- ================================================================== -->
+        <plugins>
+            
+            <!-- Maven Compiler Plugin - Java compilation configuration -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.plugin.version}</version>
+                <configuration>
+                    <!-- Java version requirements -->
+                    <source>11</source>
+                    <target>11</target>
+                    
+                    <!-- Compiler options for optimal output -->
+                    <compilerArgs>
+                        <!-- Enable all warnings for code quality -->
+                        <arg>-Xlint:all</arg>
+                        <!-- Treat warnings as errors in strict mode -->
+                        <!-- <arg>-Werror</arg> -->
+                    </compilerArgs>
+                    
+                    <!-- Encoding for source files -->
+                    <encoding>UTF-8</encoding>
+                    
+                    <!-- Show deprecation warnings -->
+                    <showDeprecation>true</showDeprecation>
+                    <showWarnings>true</showWarnings>
+                </configuration>
+            </plugin>
+            
+            <!-- Maven Shade Plugin - Create executable JAR with dependencies -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Create a single executable JAR -->
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            
+                            <!-- Transformers for JAR creation -->
+                            <transformers>
+                                <!-- Set main class for executable JAR -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>DocumentGenerator</mainClass>
+                                </transformer>
+                                
+                                <!-- Merge service files if needed -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            
+                            <!-- Exclude unnecessary files from final JAR -->
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            
+        </plugins>
+        
+        <!-- ================================================================== -->
+        <!-- RESOURCE FILTERING                                                 -->
+        <!-- ================================================================== -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        
+    </build>
+
+    <!-- ====================================================================== -->
+    <!-- PROJECT INFORMATION                                                   -->
+    <!-- ====================================================================== -->
+    
+    <!-- Development team information -->
+    <developers>
+        <developer>
+            <name>Report AI Development Team</name>
+            <email>dev@reportai.com</email>
+            <organization>Report AI System</organization>
+            <roles>
+                <role>Developer</role>
+                <role>Architect</role>
+            </roles>
+        </developer>
+    </developers>
+    
+    <!-- Project licensing information -->
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    
+    <!-- Source code management -->
+    <scm>
+        <connection>scm:git:git://github.com/reportai/document-generator.git</connection>
+        <developerConnection>scm:git:ssh://github.com/reportai/document-generator.git</developerConnection>
+        <url>https://github.com/reportai/document-generator</url>
+        <tag>HEAD</tag>
+    </scm>
+    
+    <!-- Issue tracking -->
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/reportai/document-generator/issues</url>
+    </issueManagement>
+    
+    <!-- Continuous integration -->
+    <ciManagement>
+        <system>GitHub Actions</system>
+        <url>https://github.com/reportai/document-generator/actions</url>
+    </ciManagement>
+    
+    <!-- Distribution management -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/reportai/document-generator</url>
+        </repository>
+    </distributionManagement>
+
+</project>

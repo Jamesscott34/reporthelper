@@ -164,21 +164,35 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # AI Configuration
-OPENROUTE_HOST = os.getenv('OPENROUTE_HOST', 'https://openrouter.ai/api/v1')  # OpenRoute endpoint
+OPENROUTE_HOST = os.getenv('OPENROUTE_HOST', 'https://openrouter.ai/api/v1')
 
 # API Keys for different models
 OPENROUTE_API_KEYS = {
     'deepseek': os.getenv('OPENROUTE_API_KEY_DEEPSEEK', ''),
     'tngtech': os.getenv('OPENROUTE_API_KEY_TNGTECH', ''),
     'openrouter': os.getenv('OPENROUTE_API_KEY_OPENROUTER', ''),
+    'openai': os.getenv('OPENAI_API_KEY', ''),
+    'anthropic': os.getenv('ANTHROPIC_API_KEY', ''),
+    'google': os.getenv('GOOGLE_API_KEY', ''),
 }
 
-OPENROUTE_MODELS = {
-    'breakdown': os.getenv('BREAKDOWN_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
-    'reviewer': os.getenv('REVIEWER_MODEL', 'tngtech/deepseek-r1t2-chimera:free'),
-    'finalizer': os.getenv('FINALIZER_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
-    'reanalyzer': os.getenv('REANALYZER_MODEL', 'openrouter/horizon-beta'),
-}
+# Import model configuration
+try:
+    from .model_config import get_default_model
+    OPENROUTE_MODELS = {
+        'breakdown': os.getenv('BREAKDOWN_MODEL', get_default_model('breakdown')),
+        'reviewer': os.getenv('REVIEWER_MODEL', get_default_model('reviewer')),
+        'finalizer': os.getenv('FINALIZER_MODEL', get_default_model('finalizer')),
+        'reanalyzer': os.getenv('REANALYZER_MODEL', get_default_model('reanalyzer')),
+    }
+except ImportError:
+    # Fallback to legacy models if import fails
+    OPENROUTE_MODELS = {
+        'breakdown': os.getenv('BREAKDOWN_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
+        'reviewer': os.getenv('REVIEWER_MODEL', 'tngtech/deepseek-r1t2-chimera:free'),
+        'finalizer': os.getenv('FINALIZER_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
+        'reanalyzer': os.getenv('REANALYZER_MODEL', 'openrouter/horizon-beta'),
+    }
 
 # Backward compatibility for existing code
 OLLAMA_HOST = OPENROUTE_HOST

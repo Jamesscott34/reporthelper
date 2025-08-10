@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom AI Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            max-width: 80%;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .message h2, .message h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: #007bff;
+        }
+        
+        .message strong {
+            color: #28a745;
+        }
+        
+        .message ul, .message ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        
+        .ai-message {
+            background: #28a745;
+            color: white;
+        }
+        
+        .content-preview {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+        
+        .prompt-builder {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .chat-input-container {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem 0;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3><i class="fas fa-magic text-primary"></i> Custom AI Analysis</h3>
+                    <button class="btn btn-outline-secondary" onclick="window.close()">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+                
+                <!-- Content Preview Section -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-file-text"></i> Selected Content from: <span id="section-name">Loading...</span></h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="content-preview" id="content-preview">
+                            <p class="text-muted">Loading content...</p>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                Content loaded: <span id="content-status">Waiting...</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Custom Prompt Builder -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="fas fa-pencil"></i> Custom AI Prompt Builder</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="prompt-builder">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="prompt-type" class="form-label">Prompt Type</label>
+                                    <select class="form-select" id="prompt-type">
+                                        <option value="review">Review & Improve</option>
+                                        <option value="explain">Explain & Clarify</option>
+                                        <option value="summarize">Summarize</option>
+                                        <option value="analyze">Analyze & Critique</option>
+                                        <option value="suggest">Suggest Improvements</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8">
+                                    <label for="custom-prompt" class="form-label">Custom Prompt</label>
+                                    <textarea class="form-control" id="custom-prompt" rows="3" 
+                                        placeholder="Enter your custom prompt for the AI..."></textarea>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-8">
+                                    <label for="prompt-preview" class="form-label">Prompt Preview</label>
+                                    <input type="text" class="form-control" id="prompt-preview" readonly>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button class="btn btn-warning w-100" onclick="sendToAI()">
+                                        <i class="fas fa-paper-plane"></i> Send to AI
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI Response and Chat -->
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-robot"></i> AI Response & Chat</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chat-container" id="chat-container">
+                            <div class="message ai-message">
+                                <strong>AI Assistant:</strong> Hello! I'm ready to help you analyze the selected content. Use the prompt builder above to get started, or ask me any questions directly in the chat below.
+                            </div>
+                        </div>
+                        
+                        <div class="chat-input-container">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="chat-input" 
+                                    placeholder="Ask me anything about the content..." 
+                                    onkeypress="handleChatKeyPress(event)">
+                                <button class="btn btn-primary" onclick="sendChatMessage()">
+                                    <i class="fas fa-paper-plane"></i> Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const content = urlParams.get('content');
+        const section = urlParams.get('section');
+        const prompt = urlParams.get('prompt');
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Content:', content);
+            console.log('Section:', section);
+            console.log('Prompt:', prompt);
+            
+            if (content && section) {
+                document.getElementById('section-name').textContent = decodeURIComponent(section);
+                // Decode the content and handle line breaks properly
+                const decodedContent = decodeURIComponent(content);
+                document.getElementById('content-preview').innerHTML = decodedContent.replace(/\n/g, '<br>');
+                document.getElementById('content-status').textContent = `Loaded ${decodedContent.length} characters`;
+                console.log('Decoded content:', decodedContent);
+            } else {
+                document.getElementById('content-status').textContent = 'No content provided';
+            }
+            
+            // Pre-fill custom prompt if provided
+            if (prompt) {
+                const decodedPrompt = decodeURIComponent(prompt);
+                document.getElementById('custom-prompt').value = decodedPrompt;
+                document.getElementById('prompt-type').value = 'custom';
+                console.log('Decoded prompt:', decodedPrompt);
+            }
+            
+            // Set up prompt type change handler
+            document.getElementById('prompt-type').addEventListener('change', updatePromptPreview);
+            document.getElementById('custom-prompt').addEventListener('input', updatePromptPreview);
+            
+            // Initialize prompt preview
+            updatePromptPreview();
+        });
+        
+        function updatePromptPreview() {
+            const promptType = document.getElementById('prompt-type').value;
+            const customPrompt = document.getElementById('custom-prompt').value;
+            
+            let preview = '';
+            if (promptType === 'custom') {
+                preview = customPrompt;
+            } else {
+                const typePrompts = {
+                    'review': 'Please review and improve the following content:',
+                    'explain': 'Please explain and clarify the following content:',
+                    'summarize': 'Please provide a concise summary of the following content:',
+                    'analyze': 'Please analyze and critique the following content:',
+                    'suggest': 'Please suggest improvements for the following content:'
+                };
+                preview = typePrompts[promptType] + ' ' + customPrompt;
+            }
+            
+            document.getElementById('prompt-preview').value = preview;
+        }
+        
+        function sendToAI() {
+            const prompt = document.getElementById('prompt-preview').value;
+            if (!prompt.trim()) {
+                alert('Please enter a prompt first.');
+                return;
+            }
+            
+            // Add user message to chat
+            addMessage('user', prompt);
+            
+            // Show AI is thinking
+            const thinkingId = addMessage('ai', '🤔 Thinking...');
+            
+            // Simulate AI response (replace with actual API call)
+            setTimeout(() => {
+                // Remove thinking message
+                document.getElementById(thinkingId).remove();
+                
+                // Add AI response
+                const response = generateAIResponse(prompt, content);
+                addMessage('ai', response);
+            }, 2000);
+        }
+        
+        function generateAIResponse(prompt, content) {
+            // Decode content if it's encoded
+            const decodedContent = content ? decodeURIComponent(content) : content;
+            
+            // Check if this is a simplification request
+            if (prompt.toLowerCase().includes('simplify') || prompt.toLowerCase().includes('break down') || prompt.toLowerCase().includes('step by step')) {
+                return generateSimplifiedResponse(decodedContent);
+            }
+            
+            // Check if this is a review request
+            if (prompt.toLowerCase().includes('review') || prompt.toLowerCase().includes('improve')) {
+                return generateReviewResponse(decodedContent);
+            }
+            
+            // Check if this is an explanation request
+            if (prompt.toLowerCase().includes('explain') || prompt.toLowerCase().includes('clarify')) {
+                return generateExplanationResponse(decodedContent);
+            }
+            
+            // Default response
+            return `I've analyzed your request: "${prompt}"\n\nHere's my analysis of the content:\n\n${decodedContent ? decodedContent.substring(0, 300) + '...' : 'No content provided'}\n\nI can provide more specific analysis based on your needs. What would you like me to focus on?`;
+        }
+        
+        function generateSimplifiedResponse(content) {
+            if (!content) return "No content provided to simplify.";
+            
+            // Parse the content to identify sections and subsections
+            const lines = content.split('\n').filter(line => line.trim());
+            let simplifiedResponse = "## Simplified Step-by-Step Guide\n\n";
+            
+            // Process each line to create simplified instructions
+            lines.forEach((line, index) => {
+                if (line.trim()) {
+                    if (line.match(/^\d+\.\s+/)) {
+                        // Main section (e.g., "1. Assignment Introduction")
+                        const sectionTitle = line.replace(/^\d+\.\s+/, '');
+                        simplifiedResponse += `### ${sectionTitle}\n\n`;
+                    } else if (line.match(/^\d+\.\d+\.\s+/)) {
+                        // Subsection (e.g., "1.1. Proof of Concept overview")
+                        const subsectionTitle = line.replace(/^\d+\.\d+\.\s+/, '');
+                        simplifiedResponse += `**${subsectionTitle}**\n\n`;
+                    } else if (line.startsWith('- ')) {
+                        // Bullet point
+                        const bulletContent = line.replace(/^-\s+/, '');
+                        simplifiedResponse += `• **Step ${index + 1}**: ${bulletContent}\n`;
+                        
+                        // Add explanation for technical terms
+                        if (bulletContent.toLowerCase().includes('virtualbox')) {
+                            simplifiedResponse += `  - *What this means*: VirtualBox is software that lets you run different operating systems on your computer without changing your main system\n`;
+                        } else if (bulletContent.toLowerCase().includes('ubuntu')) {
+                            simplifiedResponse += `  - *What this means*: Ubuntu is a user-friendly version of Linux, like Windows but free and open-source\n`;
+                        } else if (bulletContent.toLowerCase().includes('apache')) {
+                            simplifiedResponse += `  - *What this means*: Apache is software that makes websites accessible to visitors on the internet\n`;
+                        } else if (bulletContent.toLowerCase().includes('ssh')) {
+                            simplifiedResponse += `  - *What this means*: SSH is a secure way to connect to and control another computer over the internet\n`;
+                        } else if (bulletContent.toLowerCase().includes('firewall')) {
+                            simplifiedResponse += `  - *What this means*: A firewall is like a security guard that controls what information can enter or leave your network\n`;
+                        }
+                        
+                        simplifiedResponse += `\n`;
+                    }
+                }
+            });
+            
+            simplifiedResponse += `\n## How to Complete This Assignment\n\n`;
+            simplifiedResponse += `### Phase 1: Setup (Steps 1-3)\n`;
+            simplifiedResponse += `1. **Install VirtualBox** - Download and install the free VirtualBox software\n`;
+            simplifiedResponse += `2. **Download Ubuntu** - Get Ubuntu Server and Ubuntu Desktop versions\n`;
+            simplifiedResponse += `3. **Create Virtual Machines** - Set up separate virtual computers for server and client\n\n`;
+            
+            simplifiedResponse += `### Phase 2: Configuration (Steps 4-6)\n`;
+            simplifiedResponse += `4. **Install Apache** - Set up the web server software\n`;
+            simplifiedResponse += `5. **Create Webpage** - Build the "Under Construction" page for DCC\n`;
+            simplifiedResponse += `6. **Configure Network** - Set up permanent IP addresses\n\n`;
+            
+            simplifiedResponse += `### Phase 3: Testing & Security (Steps 7-9)\n`;
+            simplifiedResponse += `7. **Test with Lynx** - Use the text-based browser to verify your website\n`;
+            simplifiedResponse += `8. **Install SSH** - Set up secure remote access\n`;
+            simplifiedResponse += `9. **Configure Firewall** - Protect your network with security rules\n\n`;
+            
+            simplifiedResponse += `### Phase 4: Analysis (Step 10)\n`;
+            simplifiedResponse += `10. **Use Wireshark** - Monitor network traffic to understand how data flows\n\n`;
+            
+            simplifiedResponse += `## Tips for Success\n`;
+            simplifiedResponse += `• Take screenshots of each step for your documentation\n`;
+            simplifiedResponse += `• Test each component before moving to the next\n`;
+            simplifiedResponse += `• Keep notes of any error messages and how you solved them\n`;
+            simplifiedResponse += `• Research each tool to understand what it does, not just how to use it\n\n`;
+            
+            simplifiedResponse += `This approach breaks down a complex networking project into manageable, logical phases that anyone can follow!`;
+            
+            return simplifiedResponse;
+        }
+        
+        function generateReviewResponse(content) {
+            if (!content) return "No content provided to review.";
+            
+            return `## Content Review & Improvement Suggestions\n\n` +
+                   `### Strengths\n` +
+                   `• Clear structure with numbered sections and subsections\n` +
+                   `• Comprehensive coverage of technical requirements\n` +
+                   `• Logical progression from concept to implementation\n\n` +
+                   
+                   `### Areas for Improvement\n` +
+                   `• Add estimated time for each step\n` +
+                   `• Include troubleshooting tips for common issues\n` +
+                   `• Add success criteria for each phase\n` +
+                   `• Consider adding diagrams or screenshots\n\n` +
+                   
+                   `### Enhanced Structure Suggestion\n` +
+                   `Consider organizing by difficulty level:\n` +
+                   `• **Beginner Level**: Basic setup and installation\n` +
+                   `• **Intermediate Level**: Configuration and testing\n` +
+                   `• **Advanced Level**: Security and optimization\n\n` +
+                   
+                   `The content is well-organized but could benefit from more visual elements and practical examples.`;
+        }
+        
+        function generateExplanationResponse(content) {
+            if (!content) return "No content provided to explain.";
+            
+            return `## Content Explanation & Clarification\n\n` +
+                   `### What This Assignment Covers\n` +
+                   `This is a practical networking project that teaches you how to:\n` +
+                   `• Set up virtual computer networks\n` +
+                   `• Install and configure web servers\n` +
+                   `• Understand network security basics\n` +
+                   `• Use professional networking tools\n\n` +
+                   
+                   `### Why These Skills Matter\n` +
+                   `• **Virtualization**: Modern IT infrastructure relies heavily on virtual machines\n` +
+                   `• **Web Services**: Understanding how websites work is fundamental to IT\n` +
+                   `• **Network Security**: Essential for protecting data and systems\n` +
+                   `• **Professional Tools**: These are industry-standard applications\n\n` +
+                   
+                   `### Real-World Applications\n` +
+                   `• Setting up company intranets\n` +
+                   `• Creating development environments\n` +
+                   `• Testing network configurations safely\n` +
+                   `• Learning new technologies without risk\n\n` +
+                   
+                   `This assignment builds practical skills that are directly applicable to IT consulting work.`;
+        }
+        
+        function addMessage(sender, text) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            const messageId = 'msg-' + Date.now();
+            
+            messageDiv.id = messageId;
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.innerHTML = `<strong>${sender === 'user' ? 'You' : 'AI Assistant'}:</strong> ${text}`;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            return messageId;
+        }
+        
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (message) {
+                addMessage('user', message);
+                input.value = '';
+                
+                // Show AI is thinking
+                const thinkingId = addMessage('ai', '🤔 Thinking...');
+                
+                // Simulate AI response
+                setTimeout(() => {
+                    document.getElementById(thinkingId).remove();
+                    const response = generateChatResponse(message);
+                    addMessage('ai', response);
+                }, 1500);
+            }
+        }
+        
+        function generateChatResponse(message) {
+            const decodedContent = content ? decodeURIComponent(content) : content;
+            
+            // Check if user is asking for simplification
+            if (message.toLowerCase().includes('simplify') || message.toLowerCase().includes('break down') || message.toLowerCase().includes('step by step') || message.toLowerCase().includes('explain')) {
+                return generateSimplifiedResponse(decodedContent);
+            }
+            
+            // Check if user is asking for help
+            if (message.toLowerCase().includes('help') || message.toLowerCase().includes('what') || message.toLowerCase().includes('how')) {
+                return `I'm here to help you understand this content! Here are some things I can do:\n\n` +
+                       `• **Simplify complex technical terms** - I can break down jargon into simple language\n` +
+                       `• **Create step-by-step guides** - I can organize information into logical sequences\n` +
+                       `• **Explain concepts** - I can clarify what each part means and why it's important\n` +
+                       `• **Provide examples** - I can give real-world analogies to make things clearer\n\n` +
+                       `Try asking me to "simplify this content" or "explain what this means" and I'll help break it down!`;
+            }
+            
+            // Check if user wants to understand specific terms
+            if (message.toLowerCase().includes('virtualbox') || message.toLowerCase().includes('ubuntu') || message.toLowerCase().includes('apache') || message.toLowerCase().includes('ssh') || message.toLowerCase().includes('firewall')) {
+                return `Great question! Let me explain that technical term:\n\n` +
+                       generateSimplifiedResponse(decodedContent);
+            }
+            
+            // Default helpful response
+            return `I'd be happy to help you understand this content better! You can:\n\n` +
+                   `• Ask me to simplify any part of the content\n` +
+                   `• Request step-by-step instructions\n` +
+                   `• Ask me to explain technical terms\n` +
+                   `• Get help with understanding the overall structure\n\n` +
+                   `What would you like me to help you with?`;
+        }
+        
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+    </script>
+</body>
+</html>

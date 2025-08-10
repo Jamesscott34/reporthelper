@@ -15,6 +15,8 @@ from django.urls import reverse
 import json
 import os
 import threading
+from django.utils import timezone
+from django.core.files import File
 
 from .models import Document, Breakdown
 from .ai_breakdown import AIBreakdownService
@@ -66,25 +68,16 @@ def process_document_background(document_id, breakdown_id):
         
         print(f"Text extracted successfully. Length: {len(extracted_text)} characters")
         
-        # Generate AI breakdown
-        ai_service = AIBreakdownService()
-        breakdown_result = ai_service.breakdown_document(extracted_text)
+        # Don't run AI automatically - let user choose when to run it
+        # Just mark the document as ready for AI processing
+        document.status = 'ready_for_ai'
+        document.save()
         
-        if breakdown_result['success']:
-            # Update breakdown with results
-            breakdown.content = breakdown_result['breakdown']
-            breakdown.raw_breakdown = breakdown_result['raw_response']
-            breakdown.ai_model_used = breakdown_result['model_used']
-            breakdown.status = 'completed'
-            breakdown.save()
-            
-            print(f"Breakdown completed successfully for document {document.title}")
-        else:
-            breakdown.status = 'failed'
-            breakdown.save()
-            document.status = 'failed'
-            document.save()
-            print(f"Failed to process document: {breakdown_result['error']}")
+        # Keep breakdown in 'ready' status until user requests AI processing
+        breakdown.status = 'ready'
+        breakdown.save()
+        
+        print(f"Document ready for AI processing. User can now choose workflow options.")
             
     except Exception as e:
         print(f"Error processing document {document_id}: {str(e)}")
@@ -195,6 +188,149 @@ def breakdown_viewer(request, breakdown_id):
         'breakdown': breakdown,
         'document': breakdown.document
     })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def run_ai_workflow(request, breakdown_id):
+    """
+    Run AI workflow when user clicks one of the workflow buttons.
+    """
+    try:
+        print(f"Starting AI workflow for breakdown {breakdown_id}")
+        breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+        document = breakdown.document
+        
+        print(f"Document ID: {document.id}, Status: {document.status}")
+        print(f"Has extracted text: {bool(document.extracted_text)}")
+        print(f"Extracted text length: {len(document.extracted_text) if document.extracted_text else 0}")
+        
+        # Check if document has extracted text
+        if not document.extracted_text:
+            return JsonResponse({
+                'success': False,
+                'error': 'No extracted text available. Please upload a document first.'
+            })
+        
+        # Get the workflow type and current content from the request
+        data = json.loads(request.body)
+        workflow_type = data.get('workflow_type', 'breakdown')
+        current_content = data.get('current_content', document.extracted_text)
+        
+        print(f"Workflow type: {workflow_type}")
+        print(f"Content length: {len(current_content)}")
+        
+        # Update status to processing
+        breakdown.status = 'processing'
+        breakdown.save()
+        
+        print("Starting AI service...")
+        # Run AI processing based on workflow type, using current content
+        ai_service = AIBreakdownService()
+        
+        if workflow_type == 'breakdown':
+            print("Running breakdown workflow...")
+            result = ai_service.breakdown_document(current_content)
+        elif workflow_type == 'stepbystep':
+            print("Running step-by-step workflow...")
+            # For step-by-step, create simplified action steps based on the content
+            step_result = ai_service.create_step_by_step_guide(current_content)
+            # Convert step-by-step result to expected format
+            result = {
+                'success': True,
+                'breakdown': _format_step_by_step_result(step_result),
+                'raw_response': step_result.get('raw_response', ''),
+                'model_used': getattr(ai_service, 'model', 'Unknown'),
+                'step_by_step_data': step_result
+            }
+        elif workflow_type == 'report':
+            print("Running report workflow...")
+            # For report, create a detailed report reviewing both extracted text and breakdown
+            result = ai_service.create_detailed_report(
+                document.extracted_text, 
+                current_content
+            )
+        elif workflow_type == 'review-compare':
+            print("Running review-compare workflow...")
+            result = ai_service.breakdown_document(current_content)
+        else:
+            print("Running default breakdown workflow...")
+            result = ai_service.breakdown_document(current_content)
+        
+        print(f"AI result: {result}")
+        
+        if result.get('success', False):
+            # Update breakdown with results
+            if workflow_type == 'stepbystep':
+                # For step-by-step, save the structured data but preserve original breakdown
+                if not hasattr(breakdown, 'step_by_step_content') or not breakdown.step_by_step_content:
+                    # Store step-by-step content separately
+                    breakdown.step_by_step_content = result.get('step_by_step_data', {})
+                breakdown.raw_breakdown = result['raw_response']
+            else:
+                # For other workflows, save as before
+                breakdown.content = result['breakdown']
+                breakdown.raw_breakdown = result['raw_response']
+            
+            breakdown.ai_model_used = result.get('model_used', 'Unknown')
+            breakdown.status = 'completed'
+            breakdown.save()
+            
+            print("AI workflow completed successfully")
+            return JsonResponse({
+                'success': True,
+                'message': f'{workflow_type.replace("-", " ").title()} completed successfully!',
+                'breakdown': result['breakdown'],
+                'step_by_step_data': result.get('step_by_step_data')
+            })
+        else:
+            breakdown.status = 'failed'
+            breakdown.save()
+            print(f"AI workflow failed: {result.get('error', 'Unknown error')}")
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'AI processing failed')
+            })
+            
+    except Exception as e:
+        print(f"Exception in AI workflow: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+def _format_step_by_step_result(step_result):
+    """
+    Format step-by-step result for display.
+    
+    Args:
+        step_result: Result from create_step_by_step_guide
+        
+    Returns:
+        Formatted string for display
+    """
+    if not step_result or 'sections' not in step_result:
+        return "No step-by-step data available"
+    
+    sections = step_result['sections']
+    if not sections:
+        return "No step-by-step data available"
+    
+    # Format sections as a structured breakdown
+    formatted_result = "Step-by-Step Analysis:\n\n"
+    
+    for i, section in enumerate(sections):
+        if isinstance(section, dict):
+            title = section.get('title', f'Step {i+1}')
+            content = section.get('content', '')
+            formatted_result += f"{title}\n{content}\n\n"
+        else:
+            # Handle string sections
+            formatted_result += f"{section}\n\n"
+    
+    return formatted_result.strip()
 
 
 @csrf_exempt
@@ -355,6 +491,46 @@ Please improve the breakdown based on the user's feedback while maintaining the 
         }, status=500)
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_extracted_text(request, document_id):
+    """
+    Save changes to the extracted text of a document.
+    """
+    try:
+        document = get_object_or_404(Document, id=document_id)
+        data = json.loads(request.body)
+        new_text = data.get('extracted_text', '')
+        
+        if not new_text.strip():
+            return JsonResponse({
+                'success': False,
+                'error': 'Extracted text cannot be empty'
+            }, status=400)
+        
+        # Update the extracted text
+        document.extracted_text = new_text
+        document.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Extracted text updated successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+def custom_ai_view(request):
+    """
+    View for the custom AI analysis page.
+    """
+    return render(request, 'customai.html')
+
+
 def document_list(request):
     """
     Display a list of all uploaded documents.
@@ -452,6 +628,55 @@ def upload_progress(request, document_id):
 
 
 @csrf_exempt
+@require_http_methods(["POST"])
+def edit_breakdown_section(request, breakdown_id):
+    """
+    Edit a specific section in the breakdown content.
+    """
+    try:
+        breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+        data = json.loads(request.body)
+        
+        section_id = data.get('section_id')
+        new_title = data.get('title')
+        new_content = data.get('content')
+        
+        if not all([section_id, new_title, new_content]):
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing required fields: section_id, title, or content'
+            })
+        
+        # Get current breakdown content
+        current_content = breakdown.content
+        
+        # Update the specific section
+        if 'sections' in current_content and isinstance(current_content['sections'], list):
+            # Find and update the section
+            for i, section in enumerate(current_content['sections']):
+                if str(i + 1) == str(section_id):
+                    section['title'] = new_title
+                    section['content'] = new_content
+                    break
+        
+        # Save the updated breakdown
+        breakdown.content = current_content
+        breakdown.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Section updated successfully',
+            'updated_content': current_content
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error updating section: {str(e)}'
+        })
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def breakdown_status(request, breakdown_id):
     """
@@ -465,7 +690,11 @@ def breakdown_status(request, breakdown_id):
             'has_content': bool(breakdown.content.get('sections', [])),
             'has_raw_breakdown': bool(breakdown.raw_breakdown),
             'document_status': breakdown.document.status,
-            'ai_model_used': breakdown.ai_model_used
+            'ai_model_used': breakdown.ai_model_used,
+            'document': {
+                'extracted_text': breakdown.document.extracted_text,
+                'status': breakdown.document.status
+            }
         }
         
         return JsonResponse(status_data)
@@ -474,4 +703,255 @@ def breakdown_status(request, breakdown_id):
         return JsonResponse({
             'status': 'error',
             'error': str(e)
+        })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_document(request, breakdown_id):
+    """
+    Save breakdown or report as a document file (PDF or Word) using Java.
+    """
+    try:
+        breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+        data = json.loads(request.body)
+        
+        document_type = data.get('document_type')  # 'breakdown' or 'report'
+        file_format = data.get('file_format')  # 'pdf' or 'docx'
+        
+        if not all([document_type, file_format]):
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing required fields: document_type or file_format'
+            })
+        
+        # Get the original document name
+        original_name = breakdown.document.title
+        if '.' in original_name:
+            original_name = original_name.rsplit('.', 1)[0]
+        
+        # Create filename based on type
+        if document_type == 'breakdown':
+            filename = f"{original_name}_breakdown"
+        else:  # report
+            filename = f"{original_name}_report"
+        
+        # Add file extension
+        if file_format == 'pdf':
+            filename += '.pdf'
+        else:  # docx
+            filename += '.docx'
+        
+        # Prepare content for the document
+        if document_type == 'breakdown':
+            # Get breakdown content
+            content = breakdown.content.get('sections', [])
+            if not content:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No breakdown content available to save'
+                })
+            
+            # Format breakdown content
+            document_content = f"BREAKDOWN REPORT: {breakdown.document.title}\n\n"
+            for i, section in enumerate(content, 1):
+                document_content += f"{i}. {section.get('title', f'Section {i}')}\n"
+                document_content += f"{section.get('content', '')}\n\n"
+                
+        else:  # report
+            # Get report content or generate it if not available
+            if hasattr(breakdown, 'report_content') and breakdown.report_content:
+                content = breakdown.report_content.get('sections', [])
+            else:
+                # Generate report content using AI
+                from .ai_breakdown import AIBreakdownService
+                ai_service = AIBreakdownService()
+                report_result = ai_service.create_detailed_report(
+                    breakdown.document.extracted_text,
+                    str(breakdown.content)
+                )
+                content = report_result.get('sections', [])
+            
+            if not content:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No report content available to save'
+                })
+            
+            # Format report content
+            document_content = f"COMPREHENSIVE REPORT: {breakdown.document.title}\n\n"
+            for i, section in enumerate(content, 1):
+                document_content += f"{i}. {section.get('title', f'Section {i}')}\n"
+                document_content += f"{section.get('content', '')}\n\n"
+        
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'generated_documents')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Full output path
+        output_path = os.path.join(output_dir, filename)
+        
+        # Call Java to generate the document
+        try:
+            java_result = call_java_document_generator(
+                document_type, file_format, document_content, output_path
+            )
+            
+            if java_result['success']:
+                # Create a new Document record for the generated file
+                generated_doc = Document.objects.create(
+                    title=filename,
+                    file_type=file_format.upper(),
+                    document_type=document_type,
+                    status='completed',
+                    uploaded_at=timezone.now(),
+                    extracted_text=document_content[:1000] + "..." if len(document_content) > 1000 else document_content
+                )
+                
+                # Copy the generated file to the document's file field
+                with open(output_path, 'rb') as f:
+                    generated_doc.file.save(filename, File(f), save=True)
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'{document_type.title()} saved successfully as {filename}',
+                    'filename': filename,
+                    'file_format': file_format,
+                    'document_type': document_type,
+                    'download_url': generated_doc.file.url
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Java document generation failed: {java_result["error"]}'
+                })
+                
+        except Exception as java_error:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error calling Java document generator: {str(java_error)}'
+            })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error saving document: {str(e)}'
+        })
+
+
+def call_java_document_generator(document_type, file_format, content, output_path):
+    """
+    Call the Java DocumentGenerator to create PDF or Word documents.
+    
+    Args:
+        document_type: Type of document ('breakdown' or 'report')
+        file_format: File format ('pdf' or 'docx')
+        content: Document content to include
+        output_path: Where to save the generated file
+        
+    Returns:
+        Dict with success status and error message if any
+    """
+    try:
+        import subprocess
+        import tempfile
+        
+        # Create a temporary file with the content
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+            temp_file.write(content)
+            temp_content_path = temp_file.name
+        
+        # Path to the Java JAR file
+        java_jar_path = os.path.join(settings.BASE_DIR, 'java_assets', 'DocumentGenerator.jar')
+        
+        # Check if JAR exists, if not, try to compile the Java file
+        if not os.path.exists(java_jar_path):
+            java_source_path = os.path.join(settings.BASE_DIR, 'java_assets', 'DocumentGenerator.java')
+            if os.path.exists(java_source_path):
+                # Try to compile the Java file
+                compile_result = subprocess.run([
+                    'javac', '-cp', 'java_assets/*', java_source_path
+                ], capture_output=True, text=True, cwd=settings.BASE_DIR)
+                
+                if compile_result.returncode != 0:
+                    return {
+                        'success': False,
+                        'error': f'Failed to compile Java source: {compile_result.stderr}'
+                    }
+                
+                # Try to run the compiled class
+                java_class_path = os.path.join(settings.BASE_DIR, 'java_assets')
+                result = subprocess.run([
+                    'java', '-cp', java_class_path, 'DocumentGenerator',
+                    document_type, file_format, temp_content_path, output_path
+                ], capture_output=True, text=True, cwd=settings.BASE_DIR)
+            else:
+                return {
+                    'success': False,
+                    'error': 'Java source file not found'
+                }
+        else:
+            # Run the JAR file
+            result = subprocess.run([
+                'java', '-jar', java_jar_path,
+                document_type, file_format, temp_content_path, output_path
+            ], capture_output=True, text=True, cwd=settings.BASE_DIR)
+        
+        # Clean up temporary file
+        try:
+            os.unlink(temp_content_path)
+        except:
+            pass
+        
+        if result.returncode == 0:
+            return {'success': True}
+        else:
+            return {
+                'success': False,
+                'error': f'Java execution failed: {result.stderr}'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Error calling Java: {str(e)}'
+        }
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_report(request, breakdown_id):
+    """
+    Generate a comprehensive report for the breakdown.
+    """
+    try:
+        breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+        data = json.loads(request.body)
+        
+        extracted_text = data.get('extracted_text', '')
+        breakdown_content = data.get('breakdown_content', '')
+        
+        # Use AI service to generate detailed report
+        from .ai_breakdown import AIBreakdownService
+        ai_service = AIBreakdownService()
+        
+        report_result = ai_service.create_detailed_report(
+            extracted_text, breakdown_content
+        )
+        
+        if report_result and report_result.get('sections'):
+            return JsonResponse({
+                'success': True,
+                'report': report_result
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Failed to generate report content'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error generating report: {str(e)}'
         })
