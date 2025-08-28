@@ -200,7 +200,7 @@ OLLAMA_MODELS = OPENROUTE_MODELS
 
 # File upload settings
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
-ALLOWED_FILE_TYPES = ['.pdf', '.docx', '.doc', '.txt']
+ALLOWED_FILE_TYPES = ['.pdf', '.docx', '.doc', '.txt', '.zip']
 
 # Celery Configuration (for background tasks)
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')

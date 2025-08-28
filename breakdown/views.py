@@ -19,9 +19,10 @@ import threading
 from django.utils import timezone
 from django.core.files import File
 
-from .models import Document, Breakdown
+from .models import Document, Breakdown, Section
 from .ai_breakdown import AIBreakdownService
 from .utils import extract_text_from_file
+from .utils import extract_text_with_pointers, unpack_zip_to_temp
 
 
 def home(request):
@@ -53,9 +54,8 @@ def process_document_background(document_id, breakdown_id):
         document.status = 'processing'
         document.save()
         
-        # Extract text from the document
-        # logging removed for production verbosity
-        extracted_text = extract_text_from_file(
+        # Extract text and pointer map
+        extracted_text, extraction_map = extract_text_with_pointers(
             document.file.path,
             document.file_type
         )
@@ -64,10 +64,9 @@ def process_document_background(document_id, breakdown_id):
             raise Exception("No text could be extracted from the document")
         
         document.extracted_text = extracted_text
+        document.extraction_map = extraction_map
         document.status = 'completed'
         document.save()
-        
-        # logging removed
         
         # Don't run AI automatically - let user choose when to run it
         # Just mark the document as ready for AI processing
@@ -78,8 +77,6 @@ def process_document_background(document_id, breakdown_id):
         breakdown.status = 'ready'
         breakdown.save()
         
-        # logging removed
-            
     except Exception as e:
         # logging removed
         try:
@@ -125,6 +122,48 @@ def upload_document(request):
             messages.error(request, error_msg)
             return redirect('breakdown:home')
         
+        # Handle ZIP uploads by unpacking and creating child documents
+        if file_extension == '.zip':
+            document = Document.objects.create(
+                title=uploaded_file.name,
+                file=uploaded_file,
+                file_type='zip',
+                uploaded_by=(request.user if request.user.is_authenticated else None),
+                status='processing'
+            )
+            temp_dir = unpack_zip_to_temp(document.file.path)
+            for root, _, files in os.walk(temp_dir):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext.lstrip('.') not in ['pdf', 'docx', 'doc', 'txt']:
+                        continue
+                    abs_path = os.path.join(root, fname)
+                    with open(abs_path, 'rb') as fh:
+                        from django.core.files.base import ContentFile
+                        content_file = ContentFile(fh.read(), name=fname)
+                        child_doc = Document.objects.create(
+                            title=fname,
+                            file=content_file,
+                            file_type=ext.replace('.', ''),
+                            uploaded_by=(request.user if request.user.is_authenticated else None),
+                            parent_document=document,
+                            status='processing'
+                        )
+                        child_bd = Breakdown.objects.create(
+                            document=child_doc,
+                            content={'sections': []},
+                            raw_breakdown='',
+                            status='processing',
+                            ai_model_used='deepseek/deepseek-coder-33b-instruct'
+                        )
+                        t = threading.Thread(
+                            target=process_document_background,
+                            args=(child_doc.id, child_bd.id)
+                        )
+                        t.daemon = True
+                        t.start()
+            return redirect('breakdown:document_list')
+
         # Create document record
         document = Document.objects.create(
             title=uploaded_file.name,
@@ -266,9 +305,35 @@ def run_ai_workflow(request, breakdown_id):
                     breakdown.step_by_step_content = result.get('step_by_step_data', {})
                 breakdown.raw_breakdown = result['raw_response']
             else:
-                # For other workflows, save as before
+                # For other workflows, save structured content
                 breakdown.content = result['breakdown']
                 breakdown.raw_breakdown = result['raw_response']
+                # Populate Section rows if structured sections are available
+                try:
+                    sections = result['breakdown'].get('sections', [])
+                    if sections and isinstance(sections, list):
+                        # Clear previous sections on re-run
+                        breakdown.sections.all().delete()
+                        for idx, sec in enumerate(sections, start=1):
+                            if isinstance(sec, dict):
+                                title = sec.get('title') or f'Section {idx}'
+                                body = sec.get('content') or sec.get('body') or ''
+                                pointers = sec.get('pointers', {})
+                            else:
+                                # Legacy string section
+                                title = f'Section {idx}'
+                                body = str(sec)
+                                pointers = {}
+                            Section.objects.create(
+                                breakdown=breakdown,
+                                order=idx,
+                                title=title[:255],
+                                body=body,
+                                pointers=pointers,
+                            )
+                except Exception:
+                    # Non-fatal; keep raw content
+                    pass
             
             breakdown.ai_model_used = result.get('model_used', 'Unknown')
             breakdown.status = 'completed'
@@ -919,11 +984,15 @@ def save_document(request, breakdown_id):
                 # Create a new Document record for the generated file
                 generated_doc = Document.objects.create(
                     title=filename,
-                    file_type=file_format.upper(),
+                    file_type=file_format.lower(),  # store lowercase to match choices
                     document_type=document_type,
                     status='completed',
                     uploaded_at=timezone.now(),
-                    extracted_text=document_content[:1000] + "..." if len(document_content) > 1000 else document_content
+                    extracted_text=(
+                        document_content[:1000] + "..."
+                        if len(document_content) > 1000
+                        else document_content
+                    ),
                 )
                 
                 # Copy the generated file to the document's file field
