@@ -573,6 +573,37 @@ def ask_question(request, breakdown_id):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+def ask_on_text(request, breakdown_id):
+    """
+    Q&A endpoint over arbitrary provided text. Body: { text, question }
+    Returns: { success, answer }
+    """
+    _ = get_object_or_404(Breakdown, id=breakdown_id)
+    try:
+        payload = json.loads(request.body or '{}')
+        text = (payload.get('text') or '').strip()
+        question = (payload.get('question') or '').strip()
+        if not text or not question:
+            return JsonResponse({'success': False, 'error': 'text and question required'}, status=400)
+        prompt = (
+            "Answer the question concisely using ONLY the provided context. "
+            "Return JSON with field 'answer' (string).\n\n"
+            "CONTEXT:\n" + text[:8000] + "\n\nQUESTION: " + question
+        )
+        ai = AIBreakdownService()
+        raw = ai._make_request(prompt) or ''
+        try:
+            parsed = json.loads(raw)
+            answer_text = parsed.get('answer', raw.strip())
+        except Exception:
+            answer_text = raw.strip()
+        return JsonResponse({'success': True, 'answer': answer_text})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
 def propose_section_update(request, breakdown_id, section_id):
     """
     Propose an AI-generated update for a section. Does NOT apply changes.
@@ -604,7 +635,17 @@ def propose_section_update(request, breakdown_id, section_id):
         except Exception:
             # Fallback: use raw text as content
             content = raw.strip() or content
-        return JsonResponse({'success': True, 'title': title, 'content': content})
+        # Store as a proposed revision
+        rev = Revision.objects.create(
+            breakdown=breakdown,
+            target_type='section',
+            target_id=section.id,
+            before={'title': section.title, 'content': section.body},
+            after={'title': (title or section.title)[:255], 'content': content or section.body},
+            status='proposed',
+            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+        )
+        return JsonResponse({'success': True, 'title': title, 'content': content, 'revision_id': rev.id})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -622,6 +663,26 @@ def apply_section_update(request, breakdown_id, section_id):
         data = json.loads(request.body or '{}')
         title = (data.get('title') or section.title)[:255]
         content = data.get('content') or section.body
+        # If a proposed revision id provided, mark it accepted, else create accepted record
+        rev_id = data.get('revision_id')
+        if rev_id:
+            try:
+                rv = Revision.objects.get(id=int(rev_id), breakdown=breakdown)
+                if rv.target_type == 'section' and int(rv.target_id) == int(section.id):
+                    rv.status = 'accepted'
+                    rv.save(update_fields=['status', 'updated_at'])
+            except Exception:
+                pass
+        else:
+            Revision.objects.create(
+                breakdown=breakdown,
+                target_type='section',
+                target_id=section.id,
+                before={'title': section.title, 'content': section.body},
+                after={'title': title, 'content': content},
+                status='accepted',
+                user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+            )
         # Create revision (proposed->accepted immediately since user clicked Apply)
         Revision.objects.create(
             breakdown=breakdown,
@@ -680,6 +741,25 @@ def revert_section_revision(request, breakdown_id, section_id, revision_id):
         rebuilt = [{'title': s.title, 'content': s.body} for s in breakdown.sections.all().order_by('order')]
         breakdown.content = {'sections': rebuilt}
         breakdown.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def reject_section_revision(request, breakdown_id, section_id, revision_id):
+    """
+    Mark a proposed revision as rejected.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    revision = get_object_or_404(Revision, id=revision_id, breakdown=breakdown)
+    if revision.target_type != 'section' or int(revision.target_id) != int(section.id):
+        return JsonResponse({'success': False, 'error': 'Revision does not apply to this section'}, status=400)
+    try:
+        revision.status = 'rejected'
+        revision.save(update_fields=['status', 'updated_at'])
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

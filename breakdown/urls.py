@@ -56,6 +56,11 @@ urlpatterns = [
         name='ask_question',
     ),
     path(
+        'breakdown/<int:breakdown_id>/ask_on_text/',
+        views.ask_on_text,
+        name='ask_on_text',
+    ),
+    path(
         'breakdown/<int:breakdown_id>/regenerate-with-comments/',
         views.regenerate_with_comments,
         name='regenerate_with_comments',
@@ -85,6 +90,12 @@ urlpatterns = [
         'revisions/<int:revision_id>/revert/',
         views.revert_section_revision,
         name='revert_section_revision',
+    ),
+    path(
+        'breakdown/<int:breakdown_id>/sections/<int:section_id>/'
+        'revisions/<int:revision_id>/reject/',
+        views.reject_section_revision,
+        name='reject_section_revision',
     ),
     path(
         'breakdown/<int:breakdown_id>/edit-section/',

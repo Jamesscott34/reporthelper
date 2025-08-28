@@ -66,10 +66,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Custom apps
     'breakdown',
-    'user_review',
-    'breakdown_review',
-    'creation',
-    'comparison_ai',
 ]
 
 MIDDLEWARE = [

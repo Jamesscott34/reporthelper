@@ -42,6 +42,7 @@
                   <button class="btn btn-outline-primary" onclick="openEditModal({{ s.id }})"><i class="fas fa-edit"></i> Edit</button>
                   <button class="btn btn-outline-info" onclick="generateSectionSteps({{ s.id }})"><i class="fas fa-stairs"></i> Step by Step</button>
                   <button class="btn btn-outline-secondary" onclick="toggleInlineQA({{ s.id }})"><i class="fas fa-question-circle"></i> Q&A</button>
+                  <button class="btn btn-outline-dark" onclick="toggleCompare({{ s.id }})"><i class="fas fa-balance-scale"></i> Compare</button>
                 </div>
               </div>
               {% if s.short_summary %}
@@ -86,6 +87,21 @@
                 <i class="fas fa-link"></i> View in Original
               </button>
               {% endif %}
+              <div class="card mt-2" id="compare-inline-{{ s.id }}" style="display:none;">
+                <div class="card-body p-2">
+                  <div class="mb-2"><strong>Original snippet used for this section</strong></div>
+                  <div class="p-2 border rounded bg-light small" id="cmp-snippet-{{ s.id }}"></div>
+                  <div class="row g-2 align-items-center mt-2">
+                    <div class="col-8">
+                      <input type="text" class="form-control form-control-sm" id="cmp-q-{{ s.id }}" placeholder="Ask about this original snippet...">
+                    </div>
+                    <div class="col-4">
+                      <button class="btn btn-primary btn-sm w-100" onclick="submitCompareQA({{ s.id }})">Ask</button>
+                    </div>
+                  </div>
+                  <div class="mt-2 p-2 border rounded bg-light" id="cmp-ans-{{ s.id }}" style="display:none;"></div>
+                </div>
+              </div>
             </div>
             {% endfor %}
           {% elif breakdown.content.sections %}
@@ -231,13 +247,14 @@ async function submitSectionQA(id){
 }
 
 // Edit flow
-function openEditModal(sectionId){ document.getElementById('editSectionId').value=sectionId; document.getElementById('editPrompt').value=''; document.getElementById('editTitle').value=''; document.getElementById('editContent').value=''; const m=new bootstrap.Modal(document.getElementById('editModal')); m.show(); fetch('{% url 'breakdown:propose_section_update' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt: document.getElementById('editPrompt').value})}).then(r=>r.json()).then(d=>{ if(d.success){ document.getElementById('editTitle').value=d.title||''; document.getElementById('editContent').value=d.content||''; }}).catch(()=>{}); }
+function openEditModal(sectionId){ document.getElementById('editSectionId').value=sectionId; document.getElementById('editPrompt').value=''; document.getElementById('editTitle').value=''; document.getElementById('editContent').value=''; const m=new bootstrap.Modal(document.getElementById('editModal')); m.show(); fetch('{% url 'breakdown:propose_section_update' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt: document.getElementById('editPrompt').value})}).then(r=>r.json()).then(d=>{ if(d.success){ document.getElementById('editTitle').value=d.title||''; document.getElementById('editContent').value=d.content||''; document.getElementById('editModal').setAttribute('data-revision-id', d.revision_id||''); }}).catch(()=>{}); }
 function applyEdit(){
   const sectionId=document.getElementById('editSectionId').value;
   const title=document.getElementById('editTitle').value;
   const content=document.getElementById('editContent').value;
+  const revId = document.getElementById('editModal').getAttribute('data-revision-id')||null;
   fetch('{% url 'breakdown:apply_section_update' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title, content})
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title, content, revision_id: revId})
   }).then(r=>r.json()).then(d=>{ if(d.success){ refreshSection(sectionId); const mEl=document.getElementById('editModal'); bootstrap.Modal.getInstance(mEl).hide(); }});
 }
 
@@ -266,6 +283,7 @@ function refreshSection(sectionId){
               '<button class="btn btn-outline-primary" onclick="openEditModal('+sectionId+')"><i class="fas fa-edit"></i> Edit</button>'+
               '<button class="btn btn-outline-info" onclick="generateSectionSteps('+sectionId+')"><i class="fas fa-stairs"></i> Step by Step</button>'+
               '<button class="btn btn-outline-secondary" onclick="toggleInlineQA('+sectionId+')"><i class="fas fa-question-circle"></i> Q&A</button>'+
+              '<button class="btn btn-outline-dark" onclick="toggleCompare('+sectionId+')"><i class="fas fa-balance-scale"></i> Compare</button>'+
               '</div></div>';
       if(d.section.short_summary){ html += '<div class="text-muted small mb-1">'+escapeHtml(d.section.short_summary)+'</div>'; }
       html += '<div class="mb-2">'+nl2br(escapeHtml(d.section.body))+'</div>';
@@ -328,6 +346,78 @@ function performSave(){
     }
   }).catch(()=> alert('Failed to save'));
 }
+
+function toggleCompare(id){
+  const el=document.getElementById('compare-inline-'+id);
+  if(!el)return;
+  if(el.style.display==='none' || !el.style.display){
+    // open and populate snippet
+    el.style.display='';
+    populateCompareSnippet(id);
+  } else {
+    el.style.display='none';
+  }
+}
+
+function populateCompareSnippet(sectionId){
+  // Try to derive a snippet from pointers and extraction_map
+  try{
+    const holder=document.getElementById('cmp-snippet-'+sectionId);
+    if(!holder) return;
+    const secEl=document.getElementById('ai-sec-'+sectionId);
+    const btn=secEl && secEl.querySelector('.citation-btn');
+    let ptr=null; try{ ptr = btn ? JSON.parse(btn.getAttribute('data-pointer')) : null; }catch(_){}
+    const map = {{ extraction_map|safe }};
+    const full = `{{ document.extracted_text|escapejs }}`;
+    let snippet='';
+    if(ptr && typeof ptr.char_start === 'number' && typeof ptr.char_end === 'number' && full){
+      const start=Math.max(0, ptr.char_start);
+      const end=Math.min(full.length, Math.max(start+1, ptr.char_end || (start+300)));
+      snippet = full.substring(start, end);
+    } else {
+      // Fallback: best-effort by page/para/line
+      if(map && map.type==='pdf' && ptr && ptr.page!=null){
+        const page = (map.pages||[]).find(p=>p.page===ptr.page);
+        if(page && page.lines && page.lines.length){
+          const s=page.lines[0].char_start||0; const e=page.lines[page.lines.length-1].char_end||s;
+          snippet = full.substring(s, Math.min(full.length, s+600));
+        }
+      } else if(map && map.type==='docx' && ptr && (ptr.index!=null || ptr.paragraph!=null)){
+        const idx = (ptr.index!=null?ptr.index:ptr.paragraph);
+        const para = (map.paragraphs||[]).find(p=>p.index===idx);
+        if(para){ snippet = full.substring(para.char_start||0, Math.min(full.length, (para.char_end||0))); }
+      } else if(map && (map.type==='txt' || map.type==='doc') && ptr && (ptr.line!=null || ptr.index!=null)){
+        const lid = (ptr.line!=null?ptr.line:ptr.index);
+        const line=(map.lines||[]).find(l=> (l.line===lid || l.index===lid));
+        if(line){ snippet = full.substring(line.char_start||0, Math.min(full.length, (line.char_end||0))); }
+      }
+    }
+    holder.textContent = snippet || '(No snippet available)';
+  }catch(e){ /* ignore */ }
+}
+
+function submitCompareQA(id){
+  const q = document.getElementById('cmp-q-'+id).value.trim();
+  if(!q) return;
+  const ans = document.getElementById('cmp-ans-'+id);
+  ans.style.display=''; ans.innerHTML='<em>Thinking...</em>';
+  const text = (document.getElementById('cmp-snippet-'+id).textContent||'').trim();
+  fetch('{% url 'breakdown:ask_on_text' breakdown.id %}',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ text, question: q })
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){ ans.innerHTML = '<strong>Answer:</strong><br>'+escapeHtml(d.answer||''); }
+    else { ans.innerHTML = '<span class="text-danger">'+(d.error||'Error')+'</span>'; }
+  }).catch(()=>{ ans.innerHTML='<span class="text-danger">Request failed</span>'; });
+}
+
+// On load, refresh each section to populate History/Revert
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[id^="ai-sec-"]').forEach(el=>{
+    const sid = el.id.replace('ai-sec-','');
+    if(sid) refreshSection(sid);
+  });
+});
 
 function revertRevision(sectionId, revisionId){
   if(!confirm('Revert to this version?')) return;
