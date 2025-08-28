@@ -34,16 +34,32 @@ class AIBreakdownService:
         self.completions_url = f"{self.host}/completions"
         self.models_url = f"{self.host}/models"
         
-        # Determine which API key to use based on the model
-        if 'deepseek' in self.model:
-            self.api_key = settings.OPENROUTE_API_KEYS['deepseek']
-        elif 'tngtech' in self.model:
-            self.api_key = settings.OPENROUTE_API_KEYS['tngtech']
-        elif 'openrouter' in self.model:
-            self.api_key = settings.OPENROUTE_API_KEYS['openrouter']
+        # Determine which API key to use based on the model/provider
+        model_lower = (self.model or '').lower()
+        if 'deepseek' in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get('deepseek', '')
+        elif 'tngtech' in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get('tngtech', '')
+        elif 'openai/' in model_lower or model_lower.startswith('openai-'):
+            self.api_key = (
+                settings.OPENROUTE_API_KEYS.get('openai')
+                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
+            )
+        elif 'anthropic/' in model_lower or 'claude' in model_lower:
+            self.api_key = (
+                settings.OPENROUTE_API_KEYS.get('anthropic')
+                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
+            )
+        elif 'google/' in model_lower or 'gemini' in model_lower:
+            self.api_key = (
+                settings.OPENROUTE_API_KEYS.get('google')
+                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
+            )
+        elif 'openrouter' in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get('openrouter', '')
         else:
-            # Default to deepseek key
-            self.api_key = settings.OPENROUTE_API_KEYS['deepseek']
+            # Default to OpenRouter key when provider is unknown
+            self.api_key = settings.OPENROUTE_API_KEYS.get('openrouter', '')
     
     def _make_request(self, prompt: str, max_retries: int = 3) -> Optional[str]:
         """
@@ -56,12 +72,16 @@ class AIBreakdownService:
         Returns:
             The AI response or None if failed
         """
+        # Token budgets to try (helps with 402 credit errors)
+        token_budgets = [1024, 512, 256]
         for attempt in range(max_retries):
             try:
                 logger.debug("Attempt %s/%s", attempt + 1, max_retries)
                 logger.debug("API Key present: %s", bool(self.api_key))
                 
                 # Use chat completions endpoint for better results
+                # Choose a conservative max_tokens to avoid 402 errors
+                budget = token_budgets[min(attempt, len(token_budgets) - 1)]
                 payload = {
                     "model": self.model,
                     "messages": [
@@ -71,8 +91,8 @@ class AIBreakdownService:
                         }
                     ],
                     "stream": False,
-                    "temperature": 0.7,
-                    "max_tokens": 8000,
+                    "temperature": 0.4,
+                    "max_tokens": budget,
                     "top_p": 0.9
                 }
                 
@@ -295,6 +315,8 @@ class AIBreakdownService:
             List of prompts to try
         """
         prompts = []
+        # Determine target number of sections based on length
+        target_sections = max(6, min(15, len(text) // 2500 or 6))
         
         # Prompt 1: Comprehensive structured breakdown
         prompt1 = f"""You are a content breakdown assistant. Your task is to take a full document and break it down completely into clear, detailed step-by-step instructions.
@@ -374,7 +396,18 @@ Document:
 
 Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
 
-        prompts.extend([prompt1, prompt2, prompt3])
+        # Prompt 4: Strict JSON schema to ensure machine-parsable output
+        prompt4 = (
+            '{\n'
+            '  "instruction": "Return ONLY valid JSON. No prose.",\n'
+            '  "schema": {"sections": [{"title": "string", "content": "string"}]},\n'
+            f'  "requirements": "Create at least {target_sections} sections covering ALL content. Titles must be concise; contents may use bullet lists.",\n'
+            '  "sections": "Analyze the following document and output JSON with sections as specified.",\n'
+            f'  "document": """{text}"""\n'
+            '}'
+        )
+
+        prompts.extend([prompt1, prompt2, prompt3, prompt4])
         return prompts
     
     def _parse_breakdown_response(self, response: str) -> Dict[str, Any]:
@@ -387,6 +420,34 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         Returns:
             Structured breakdown data
         """
+        # First: try to parse JSON with a 'sections' array
+        try:
+            maybe_json = response.strip()
+            # Heuristic: find JSON block if wrapped in prose
+            if not maybe_json.startswith('{'):
+                import re as _re
+                match = _re.search(r"\{[\s\S]*\}\s*$", response)
+                if match:
+                    maybe_json = match.group(0)
+            data = json.loads(maybe_json)
+            if isinstance(data, dict) and isinstance(data.get('sections'), list):
+                # Ensure each section is a dict with title/content
+                normalized = []
+                for i, sec in enumerate(data['sections'], start=1):
+                    if isinstance(sec, dict):
+                        title = sec.get('title') or f'Section {i}'
+                        content = sec.get('content') or ''
+                        normalized.append({'title': title, 'content': content})
+                    else:
+                        normalized.append({'title': f'Section {i}', 'content': str(sec)})
+                return {
+                    'sections': normalized,
+                    'raw_response': response,
+                    'total_sections': len(normalized),
+                }
+        except Exception:
+            pass
+
         # Try to extract numbered sections
         sections = []
         
@@ -432,17 +493,38 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         
         # If still no sections, split by paragraphs
         if not sections:
-            paragraphs = [p.strip() for p in response.split('\n\n') if p.strip() and len(p.strip()) > 20]
-            sections = paragraphs[:15]  # Increased limit to 15 sections
+            paragraphs = [
+                p.strip() for p in response.split('\n\n')
+                if p.strip() and len(p.strip()) > 40
+            ]
+            # Convert to structured dicts with synthetic titles
+            tmp = []
+            for i, p in enumerate(paragraphs[:15], start=1):
+                first_line = p.split('\n', 1)[0]
+                title = (first_line[:80] + '...') if len(first_line) > 80 else first_line
+                tmp.append({'title': f'Section {i}: {title}', 'content': p})
+            if tmp:
+                sections = tmp
         
         # Ensure we have at least some content
         if not sections:
-            sections = [response[:1000] + "..." if len(response) > 1000 else response]
+            fallback = response[:1000] + "..." if len(response) > 1000 else response
+            sections = [{'title': 'Section 1', 'content': fallback}]
         
+        # If sections are strings, normalize to dicts
+        normalized_sections = []
+        for i, sec in enumerate(sections, start=1):
+            if isinstance(sec, dict):
+                normalized_sections.append(
+                    {'title': sec.get('title') or f'Section {i}', 'content': sec.get('content') or ''}
+                )
+            else:
+                normalized_sections.append({'title': f'Section {i}', 'content': str(sec)})
+
         return {
-            'sections': sections,
+            'sections': normalized_sections,
             'raw_response': response,
-            'total_sections': len(sections)
+            'total_sections': len(normalized_sections)
         }
     
     def _create_simple_breakdown(self, text: str) -> Dict[str, Any]:
@@ -722,3 +804,60 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
             'raw_response': 'Simple report created automatically',
             'total_sections': len(sections)
         } 
+
+    def summarize_document(self, text: str) -> str:
+        """
+        Create a concise document-level summary (3-5 sentences).
+
+        Parameters
+        ----------
+        text : str
+            Full document text.
+
+        Returns
+        -------
+        str
+            Short summary.
+        """
+        prompt = (
+            "Summarize the following document in 3-5 concise sentences, "
+            "covering the main purpose, key points, and conclusions.\n\n"
+            + text
+        )
+        try:
+            resp = self._make_request(prompt)
+            return (resp or "").strip()[:2000]
+        except Exception:
+            # Simple fallback: first few sentences
+            sentences = [s.strip() for s in text.split(".") if s.strip()]
+            return ". ".join(sentences[:4]) + ("." if sentences else "")
+
+    def summarize_section(self, title: str, body: str) -> str:
+        """
+        Create a very short section summary (1-3 sentences).
+
+        Parameters
+        ----------
+        title : str
+            Section title.
+        body : str
+            Section content.
+
+        Returns
+        -------
+        str
+            Short summary.
+        """
+        snippet = body[:2000]
+        prompt = (
+            "Provide a 1-3 sentence summary for the section titled '"
+            + title
+            + "'. Focus on key points and outcomes.\n\n"
+            + snippet
+        )
+        try:
+            resp = self._make_request(prompt)
+            return (resp or "").strip()[:800]
+        except Exception:
+            sentences = [s.strip() for s in snippet.split(".") if s.strip()]
+            return (sentences[0] + ".") if sentences else ""

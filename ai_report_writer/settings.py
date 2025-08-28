@@ -188,10 +188,11 @@ try:
 except ImportError:
     # Fallback to legacy models if import fails
     OPENROUTE_MODELS = {
-        'breakdown': os.getenv('BREAKDOWN_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
-        'reviewer': os.getenv('REVIEWER_MODEL', 'tngtech/deepseek-r1t2-chimera:free'),
-        'finalizer': os.getenv('FINALIZER_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free'),
-        'reanalyzer': os.getenv('REANALYZER_MODEL', 'openrouter/horizon-beta'),
+        # Prefer low-cost/free models when credits are low
+        'breakdown': os.getenv('BREAKDOWN_MODEL', 'mistralai/mistral-small'),
+        'reviewer': os.getenv('REVIEWER_MODEL', 'qwen/qwen3-8b'),
+        'finalizer': os.getenv('FINALIZER_MODEL', 'mistralai/mistral-small'),
+        'reanalyzer': os.getenv('REANALYZER_MODEL', 'qwen/qwen3-8b'),
     }
 
 # Backward compatibility for existing code

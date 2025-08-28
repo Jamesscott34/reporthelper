@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+
+{% block title %}Compare View - {{ breakdown.document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="fas fa-columns"></i> Compare: AI vs Original</h5>
+    <div class="d-flex align-items-center">
+      <div class="btn-group btn-group-sm me-2" role="group">
+        <button class="btn btn-outline-primary" id="prevCitationBtn" onclick="prevCitation()">
+          <i class="fas fa-chevron-left"></i> Prev
+        </button>
+        <button class="btn btn-outline-primary" id="nextCitationBtn" onclick="nextCitation()">
+          Next <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+      <a href="{% url 'breakdown:breakdown_viewer' breakdown.id %}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Back
+      </a>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Left: AI Output -->
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-robot"></i> AI Output</span>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" onclick="openSaveModal('breakdown','pdf')"><i class="fas fa-file-pdf"></i> Save PDF</button>
+            <button class="btn btn-outline-primary" onclick="openSaveModal('breakdown','docx')"><i class="fas fa-file-word"></i> Save Word</button>
+          </div>
+        </div>
+        <div class="card-body" id="ai-pane">
+          {% if breakdown.sections.all %}
+            {% for s in breakdown.sections.all %}
+            <div class="mb-3" id="ai-sec-{{ s.id }}">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">{{ s.order }}. {{ s.title }}</h6>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-primary" onclick="openEditModal({{ s.id }})"><i class="fas fa-edit"></i> Edit</button>
+                  <button class="btn btn-outline-info" onclick="generateSectionSteps({{ s.id }})"><i class="fas fa-stairs"></i> Step by Step</button>
+                  <button class="btn btn-outline-secondary" onclick="toggleInlineQA({{ s.id }})"><i class="fas fa-question-circle"></i> Q&A</button>
+                </div>
+              </div>
+              {% if s.short_summary %}
+              <div class="text-muted small mb-1">{{ s.short_summary }}</div>
+              {% endif %}
+              <div class="mb-2">{{ s.body|linebreaks }}</div>
+              {% if s.howtos.all %}
+              {% for ht in s.howtos.all %}
+              <div class="step-by-step-guide mt-2">
+                <h6 class="mb-2"><i class="fas fa-stairs"></i> {{ ht.title|default:'How to apply this section' }}</h6>
+                {% for step in ht.steps %}
+                <div class="step-guide-item">
+                  <div class="step-guide-title"><i class="fas fa-check-circle"></i> {{ step.title }}</div>
+                  <div class="steps-content">{{ step.content|linebreaks }}</div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+              {% endif %}
+              <div class="card mt-2" id="qa-inline-{{ s.id }}" style="display:none;">
+                <div class="card-body p-2">
+                  <div class="row g-2 align-items-center">
+                    <div class="col-7">
+                      <input type="text" class="form-control form-control-sm" id="qa-q-{{ s.id }}" placeholder="Ask about this section...">
+                    </div>
+                    <div class="col-3">
+                      <select class="form-select form-select-sm" id="qa-s-{{ s.id }}">
+                        <option value="section">Section</option>
+                        <option value="neighbors">Neighbors</option>
+                        <option value="document">Document</option>
+                      </select>
+                    </div>
+                    <div class="col-2">
+                      <button class="btn btn-primary btn-sm w-100" onclick="submitSectionQA({{ s.id }})">Ask</button>
+                    </div>
+                  </div>
+                  <div class="mt-2 p-2 border rounded bg-light" id="qa-ans-{{ s.id }}" style="display:none;"></div>
+                </div>
+              </div>
+              {% if s.pointers %}
+              <button class="btn btn-sm btn-outline-primary citation-btn" data-pointer='{{ s.pointers|escapejs }}' onclick="scrollToPointer(getPointer(this))">
+                <i class="fas fa-link"></i> View in Original
+              </button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% elif breakdown.content.sections %}
+            {% for sec in breakdown.content.sections %}
+            <div class="mb-3">
+              <h6>{{ forloop.counter }}. {{ sec.title|default:'Section' }}</h6>
+              <div>{{ sec.content|default:sec|linebreaks }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-muted">No AI content available.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Original Text -->
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-file-alt"></i> Original</span>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="widenContext">
+            <label class="form-check-label" for="widenContext">Widen context</label>
+          </div>
+        </div>
+        <div class="card-body" id="orig-pane" style="white-space: pre-wrap;">
+          {% if orig_segments %}
+            <div class="toc mb-3 p-2 border rounded bg-light" id="orig-toc">
+              <div class="small text-muted mb-1"><i class="fas fa-list"></i> Contents</div>
+              <div class="toc-grid">
+                {% for seg in orig_segments %}
+                  <a href="#{{ seg.id }}" class="toc-link" onclick="jumpToAnchor('{{ seg.id }}'); return false;">{{ seg.label }}</a>
+                {% endfor %}
+              </div>
+            </div>
+            <div id="orig-text">
+              {% for seg in orig_segments %}
+              <div class="orig-segment mb-3" id="{{ seg.id }}" data-start="{{ seg.start }}">
+                <h6 class="text-muted">{{ seg.label }}</h6>
+                <div class="segment-body">{{ seg.text }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          {% elif document.extracted_text %}
+            <div id="orig-text">{{ document.extracted_text }}</div>
+          {% else %}
+            <div class="text-muted">No extracted text available.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Section</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editSectionId">
+        <div class="mb-2">
+          <label class="form-label">Prompt (optional)</label>
+          <textarea id="editPrompt" class="form-control" rows="3" placeholder="Describe how to improve this section..."></textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Proposed Title</label>
+          <input id="editTitle" class="form-control" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Proposed Content</label>
+          <textarea id="editContent" class="form-control" rows="10"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="applyEdit()">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Modal -->
+<div class="modal fade" id="saveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Save Document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="saveType">
+        <input type="hidden" id="saveFormat">
+        <div class="mb-2">
+          <label class="form-label">Filename (no extension)</label>
+          <input id="saveFilename" class="form-control" placeholder="my_document">
+        </div>
+        <div class="small text-muted">Format will be appended automatically.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="performSave()">Save</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<script>
+const extractionType = '{{ extraction_map.type|default:"" }}';
+function getPointer(btn){ try { return JSON.parse(btn.getAttribute('data-pointer')); } catch(e){ return null; } }
+function getAllPointers(){ const els = document.querySelectorAll('.citation-btn'); const list = []; els.forEach((el, idx)=>{ const p = getPointer(el); if (p) list.push({ptr:p, el, idx}); }); list.sort((a,b)=>(a.ptr.char_start||0)-(b.ptr.char_start||0)); return list; }
+let citationIndex = -1;
+function nextCitation(){ const items=getAllPointers(); if(!items.length)return; citationIndex=(citationIndex+1)%items.length; scrollToPointer(items[citationIndex].ptr); }
+function prevCitation(){ const items=getAllPointers(); if(!items.length)return; citationIndex=(citationIndex-1+items.length)%items.length; scrollToPointer(items[citationIndex].ptr); }
+function scrollToPointer(ptr){ try{ const pane=document.getElementById('orig-pane'); const textEl=document.getElementById('orig-text'); if(!pane||!textEl||!ptr)return; let anchorId=null; if(extractionType==='pdf'&&(ptr.page||ptr.Page)){anchorId='page-'+(ptr.page||ptr.Page);} else if(extractionType==='docx'&&(ptr.index||ptr.paragraph)){anchorId='para-'+(ptr.index||ptr.paragraph);} else if((extractionType==='txt'||extractionType==='doc')&&(ptr.line||ptr.index)){anchorId='line-'+(ptr.line||ptr.index);} if(anchorId){ const seg=document.getElementById(anchorId); if(seg){ document.querySelectorAll('.orig-segment.highlight').forEach(el=>el.classList.remove('highlight')); seg.classList.add('highlight'); seg.scrollIntoView({behavior:'smooth', block:'center'}); return; } } const widen=document.getElementById('widenContext')&&document.getElementById('widenContext').checked; const full=textEl.textContent; const start=Math.max(0, ptr.char_start||0); const span=widen?300:120; const end=Math.min(full.length,start+span); const before=full.slice(0,start); const target=full.slice(start,end); const after=full.slice(end); textEl.innerHTML=''; const beforeNode=document.createTextNode(before); const mark=document.createElement('mark'); mark.textContent=target; const afterNode=document.createTextNode(after); textEl.appendChild(beforeNode); textEl.appendChild(mark); textEl.appendChild(afterNode); const ratio=start/Math.max(full.length,1); pane.scrollTop=ratio*(textEl.scrollHeight-pane.clientHeight);}catch(e){console.error(e);} }
+function jumpToAnchor(id){ const seg=document.getElementById(id); if(!seg)return; document.querySelectorAll('.orig-segment.highlight').forEach(el=>el.classList.remove('highlight')); seg.classList.add('highlight'); seg.scrollIntoView({behavior:'smooth', block:'start'}); }
+// removed header Q&A button; inline per-section Q&A is available
+function toggleInlineQA(id){ const el=document.getElementById('qa-inline-'+id); if(!el)return; el.style.display = (el.style.display==='none'||!el.style.display)?'':'none'; }
+async function submitSectionQA(id){
+  const q = document.getElementById('qa-q-'+id).value.trim();
+  const scope = document.getElementById('qa-s-'+id).value;
+  if(!q) return;
+  const ansBox = document.getElementById('qa-ans-'+id);
+  ansBox.style.display=''; ansBox.innerHTML='<em>Thinking...</em>';
+  try{
+    const resp = await fetch('{% url 'breakdown:ask_question' breakdown.id %}',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question:q, scope, section_id:id})
+    });
+    const data = await resp.json();
+    if(data.success){
+      let html = '<strong>Answer:</strong><br>'+(data.answer||'');
+      if(data.citations && data.citations.length){ html += '<hr><small class="text-muted">Citations available in Compare View.</small>'; }
+      ansBox.innerHTML = html;
+    } else {
+      ansBox.innerHTML = '<span class="text-danger">'+(data.error||'Error')+'</span>';
+    }
+  }catch(e){ ansBox.innerHTML = '<span class="text-danger">Request failed</span>'; }
+}
+
+// Edit flow
+function openEditModal(sectionId){ document.getElementById('editSectionId').value=sectionId; document.getElementById('editPrompt').value=''; document.getElementById('editTitle').value=''; document.getElementById('editContent').value=''; const m=new bootstrap.Modal(document.getElementById('editModal')); m.show(); fetch('{% url 'breakdown:propose_section_update' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt: document.getElementById('editPrompt').value})}).then(r=>r.json()).then(d=>{ if(d.success){ document.getElementById('editTitle').value=d.title||''; document.getElementById('editContent').value=d.content||''; }}).catch(()=>{}); }
+function applyEdit(){
+  const sectionId=document.getElementById('editSectionId').value;
+  const title=document.getElementById('editTitle').value;
+  const content=document.getElementById('editContent').value;
+  fetch('{% url 'breakdown:apply_section_update' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title, content})
+  }).then(r=>r.json()).then(d=>{ if(d.success){ refreshSection(sectionId); const mEl=document.getElementById('editModal'); bootstrap.Modal.getInstance(mEl).hide(); }});
+}
+
+// Section step-by-step
+function generateSectionSteps(sectionId){
+  const btn=document.querySelector('#ai-sec-'+sectionId+' .btn-outline-info');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Working'; }
+  fetch('{% url 'breakdown:section_step_by_step' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'),{ method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-stairs"></i> Step by Step'; }
+      if(d.success){ refreshSection(sectionId); }
+      else { alert('Error: '+(d.error||'Failed')); }
+    }).catch(()=>{ if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-stairs"></i> Step by Step'; } });
+}
+
+function refreshSection(sectionId){
+  fetch('{% url 'breakdown:get_section' breakdown.id 0 %}'.replace('/0/','/'+sectionId+'/'))
+    .then(r=>r.json()).then(d=>{
+      if(!d.success) return;
+      const root=document.getElementById('ai-sec-'+sectionId);
+      if(!root) return;
+      let html='';
+      html += '<div class="d-flex justify-content-between align-items-center">';
+      html += '<h6 class="mb-0">'+(d.section.order)+'. '+escapeHtml(d.section.title)+'</h6>';
+      html += '<div class="btn-group btn-group-sm">'+
+              '<button class="btn btn-outline-primary" onclick="openEditModal('+sectionId+')"><i class="fas fa-edit"></i> Edit</button>'+
+              '<button class="btn btn-outline-info" onclick="generateSectionSteps('+sectionId+')"><i class="fas fa-stairs"></i> Step by Step</button>'+
+              '<button class="btn btn-outline-secondary" onclick="toggleInlineQA('+sectionId+')"><i class="fas fa-question-circle"></i> Q&A</button>'+
+              '</div></div>';
+      if(d.section.short_summary){ html += '<div class="text-muted small mb-1">'+escapeHtml(d.section.short_summary)+'</div>'; }
+      html += '<div class="mb-2">'+nl2br(escapeHtml(d.section.body))+'</div>';
+      if(d.howtos && d.howtos.length){
+        d.howtos.forEach(ht=>{
+          html += '<div class="step-by-step-guide mt-2">';
+          html += '<h6 class="mb-2"><i class="fas fa-stairs"></i> '+escapeHtml(ht.title||'How to apply this section')+'</h6>';
+          (ht.steps||[]).forEach(st=>{
+            html += '<div class="step-guide-item">'+
+                    '<div class="step-guide-title"><i class="fas fa-check-circle"></i> '+escapeHtml(st.title||'')+'</div>'+
+                    '<div class="steps-content">'+nl2br(escapeHtml(st.content||''))+'</div>'+
+                    '</div>';
+          });
+          html += '</div>';
+        });
+      }
+      // Append history drawer
+      html += '<details class="mt-2"><summary>History</summary>';
+      if(d.revisions && d.revisions.length){
+        html += '<ul class="small">';
+        d.revisions.forEach(rv=>{
+          html += '<li>['+rv.status+'] '+(rv.created_at||'')+' '+
+                  '<button class="btn btn-xs btn-outline-danger ms-2" onclick="revertRevision('+sectionId+','+rv.id+')">Revert</button>'+
+                  '</li>';
+        });
+        html += '</ul>';
+      } else {
+        html += '<div class="small text-muted">No revisions yet.</div>';
+      }
+      html += '</details>';
+      const qa = document.getElementById('qa-inline-'+sectionId);
+      const qaHTML = qa ? qa.outerHTML : '';
+      root.innerHTML = html + qaHTML;
+    });
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function nl2br(s){ return (s||'').replace(/\n/g,'<br>'); }
+
+// Save helpers (uses python endpoint)
+function openSaveModal(type, format){
+  document.getElementById('saveType').value = type;
+  document.getElementById('saveFormat').value = format;
+  document.getElementById('saveFilename').value = '';
+  new bootstrap.Modal(document.getElementById('saveModal')).show();
+}
+function performSave(){
+  const type = document.getElementById('saveType').value;
+  const format = document.getElementById('saveFormat').value;
+  const name = document.getElementById('saveFilename').value.trim();
+  fetch('{% url 'breakdown:save_document' breakdown.id %}',{
+    method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body: JSON.stringify({ document_type: type, file_format: format, filename: name })
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){
+      bootstrap.Modal.getInstance(document.getElementById('saveModal')).hide();
+      window.open(d.download_url, '_blank');
+    } else {
+      alert(d.error||'Failed to save');
+    }
+  }).catch(()=> alert('Failed to save'));
+}
+
+function revertRevision(sectionId, revisionId){
+  if(!confirm('Revert to this version?')) return;
+  fetch('{% url 'breakdown:revert_section_revision' breakdown.id 0 0 %}'.replace('/0/0/','/'+sectionId+'/revisions/'+revisionId+'/revert/'),{
+    method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){ refreshSection(sectionId); }
+    else { alert(d.error||'Failed to revert'); }
+  }).catch(()=> alert('Failed to revert'));
+}
+</script>
+
+<style>
+.orig-segment.highlight { background-color: #fff3cd; border-left: 3px solid #ffc107; padding-left: 6px; }
+.toc-grid { display:flex; flex-wrap:wrap; gap:6px; }
+.toc-link { font-size: 0.85rem; padding:2px 6px; border:1px solid #dee2e6; border-radius:4px; background:#fff; text-decoration:none; }
+.toc-link:hover { background:#f8f9fa; }
+</style>
+{% endblock %}
+

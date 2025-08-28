@@ -738,6 +738,9 @@
                         <button class="btn btn-light btn-sm" onclick="toggleMarkers()">
                             <i class="fas fa-map-marker-alt"></i> Toggle Markers
                         </button>
+                        <a href="{% url 'breakdown:compare_split' breakdown.id %}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-columns"></i> Compare View
+                        </a>
                         <a href="{% url 'breakdown:breakdown_detail' breakdown.id %}" class="btn btn-outline-light btn-sm">
                             <i class="fas fa-arrow-left"></i> Back
                         </a>
@@ -970,6 +973,14 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="col-md-3">
+                                        <div class="workflow-button-container">
+                                            <button class="btn btn-secondary w-100 py-3" id="qa-btn" onclick="showQA()">
+                                                <i class="fas fa-question-circle"></i><br>
+                                                <strong>Q&A</strong>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                             </div>
@@ -988,6 +999,34 @@
                             
                             <!-- Workflow Content Sections -->
                             <div id="workflow-sections" style="display: none;">
+                                <!-- Q&A Section -->
+                                <div class="workflow-section mb-4" id="qa-section" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-question-circle"></i> Per-Section Q&A
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-2 align-items-center mb-3">
+                                                <div class="col-md-8">
+                                                    <input type="text" id="qa-question" class="form-control form-control-sm" placeholder="Ask a question about this document or a section...">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <select id="qa-scope" class="form-select form-select-sm">
+                                                        <option value="section">Section</option>
+                                                        <option value="neighbors">Section + Neighbors</option>
+                                                        <option value="document">Whole Document</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <button class="btn btn-primary btn-sm w-100" onclick="submitQA()"><i class="fas fa-paper-plane"></i> Ask</button>
+                                                </div>
+                                            </div>
+                                            <div id="qa-answer" class="p-3 border rounded bg-light" style="display:none;"></div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <!-- Breakdown Section -->
                                 <div class="workflow-section mb-4" id="breakdown-section" style="display: none;">
                                     <div class="card">
@@ -1016,6 +1055,12 @@
                                                 {% if breakdown.content.sections %}
                                                     <div class="breakdown-sections">
                                                         <h6><i class="fas fa-list-ul"></i> Document Breakdown Analysis</h6>
+                                                        {% if breakdown.document_summary %}
+                                                        <div class="mb-3 p-3 border rounded bg-light">
+                                                            <strong><i class="fas fa-sticky-note"></i> Document Summary:</strong>
+                                                            <div class="mt-1">{{ breakdown.document_summary|linebreaks }}</div>
+                                                        </div>
+                                                        {% endif %}
                                                         {% for section in breakdown.content.sections %}
                                                             <div class="breakdown-section-item mb-4" data-section-id="{{ forloop.counter }}" data-section-title="{{ section.title|escapejs }}" data-section-content="{{ section.content|escapejs }}">
                                                                 <div class="section-header d-flex justify-content-between align-items-center">
@@ -1032,6 +1077,7 @@
                                                                         </button>
                                                                     </div>
                                                                 </div>
+                                                                <!-- Short summary shown in structured sections block; omitted here to avoid invalid filters -->
                                                                 <div class="section-content">
                                                                     {{ section.content|linebreaks }}
                                                                     <div class="subsection-buttons mt-3" id="subsection-buttons-{{ forloop.counter }}">
@@ -1041,12 +1087,53 @@
                                                             </div>
                                                         {% endfor %}
                                                     </div>
-                                                    
-
+                                                    {% with howto=breakdown.howtos.first %}
+                                                    {% if howto %}
+                                                    <div class="step-by-step-guide mt-3">
+                                                        <h6 class="mb-2"><i class="fas fa-stairs"></i> How to apply this document</h6>
+                                                        {% for step in howto.steps %}
+                                                        <div class="step-guide-item">
+                                                            <div class="step-guide-title"><i class="fas fa-check-circle"></i> {{ step.title }}</div>
+                                                            <div class="steps-content">{{ step.content|linebreaks }}</div>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% endif %}
+                                                    {% endwith %}
                                                 {% else %}
                                                     <p>Breakdown content will be displayed here...</p>
                                                 {% endif %}
                                             </div>
+                                            <script>
+                                            function showQA(){
+                                                document.getElementById('workflow-sections').style.display = '';
+                                                document.getElementById('qa-section').style.display = '';
+                                                document.getElementById('content-display').style.display = 'none';
+                                            }
+                                            async function submitQA(){
+                                                const q = document.getElementById('qa-question').value.trim();
+                                                const scope = document.getElementById('qa-scope').value;
+                                                if(!q){ return; }
+                                                const resp = await fetch('{% url "breakdown:ask_question" breakdown.id %}', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                                                    body: JSON.stringify({ question: q, scope, section_id: null })
+                                                });
+                                                const data = await resp.json();
+                                                const box = document.getElementById('qa-answer');
+                                                if(data.success){
+                                                    box.style.display = '';
+                                                    let html = '<strong>Answer:</strong><br>' + (data.answer || '');
+                                                    if (data.citations && data.citations.length){
+                                                        html += '<hr><small class="text-muted">Citations available in Compare View.</small>';
+                                                    }
+                                                    box.innerHTML = html;
+                                                } else {
+                                                    box.style.display = '';
+                                                    box.innerHTML = '<span class="text-danger">' + (data.error || 'Error') + '</span>';
+                                                }
+                                            }
+                                            </script>
                                             <div class="section-editor" id="breakdown-editor" style="display: none;">
                                                 <textarea class="form-control" id="breakdown-editor-text" rows="15" placeholder="Enter breakdown content..."></textarea>
                                             </div>
@@ -2310,6 +2397,35 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         generateSubsectionButtons();
     }, 500);
+});
+// Save buttons wiring
+document.addEventListener('click', function(e){
+    const btn = e.target.closest('.save-btn');
+    if(!btn) return;
+    e.preventDefault();
+    const type = btn.getAttribute('data-type');
+    const format = btn.getAttribute('data-format');
+    const breakdownId = {{ breakdown.id }};
+    const statusBox = document.getElementById('saveStatus');
+    statusBox.className = 'save-status info';
+    statusBox.style.display = 'block';
+    statusBox.textContent = 'Generating '+type+' as '+format.toUpperCase()+'...';
+    fetch('{% url 'breakdown:save_document' 0 %}'.replace('/0/','/'+breakdownId+'/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ document_type: type, file_format: format })
+    }).then(r=>r.json()).then(d=>{
+        if(d.success){
+            statusBox.className = 'save-status success';
+            statusBox.innerHTML = 'Saved: <a href="'+d.download_url+'" target="_blank">'+d.filename+'</a>';
+        } else {
+            statusBox.className = 'save-status error';
+            statusBox.textContent = d.error || 'Failed to save document';
+        }
+    }).catch(()=>{
+        statusBox.className = 'save-status error';
+        statusBox.textContent = 'Failed to save document';
+    });
 });
 
 function toggleMarkers() {

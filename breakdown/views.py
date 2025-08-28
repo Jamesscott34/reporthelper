@@ -19,7 +19,7 @@ import threading
 from django.utils import timezone
 from django.core.files import File
 
-from .models import Document, Breakdown, Section
+from .models import Document, Breakdown, Section, HowTo, QAEntry, Revision
 from .ai_breakdown import AIBreakdownService
 from .utils import extract_text_from_file
 from .utils import extract_text_with_pointers, unpack_zip_to_temp
@@ -230,6 +230,68 @@ def breakdown_viewer(request, breakdown_id):
     })
 
 
+def compare_split(request, breakdown_id):
+    """
+    Split view: left shows AI outputs, right shows original text with pointers.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    document = breakdown.document
+    extraction_map = getattr(document, 'extraction_map', {}) or {}
+
+    # Build anchored segments from extraction_map for precise jumps
+    orig_segments = []
+    text = document.extracted_text or ''
+    try:
+        mtype = extraction_map.get('type')
+        if mtype == 'pdf':
+            for page in extraction_map.get('pages', []):
+                lines = page.get('lines', [])
+                if not lines:
+                    continue
+                start = lines[0].get('char_start', 0)
+                end = lines[-1].get('char_end', 0)
+                segment_text = text[start:end]
+                orig_segments.append({
+                    'id': f"page-{page.get('page', 0)}",
+                    'label': f"Page {page.get('page', 0)}",
+                    'start': start,
+                    'text': segment_text,
+                })
+        elif mtype == 'docx':
+            for para in extraction_map.get('paragraphs', []):
+                start = para.get('char_start', 0)
+                end = para.get('char_end', 0)
+                segment_text = text[start:end]
+                orig_segments.append({
+                    'id': f"para-{para.get('index', 0)}",
+                    'label': f"Paragraph {para.get('index', 0)}",
+                    'start': start,
+                    'text': segment_text,
+                })
+        elif mtype in ('txt', 'doc'):
+            for line in extraction_map.get('lines', []):
+                start = line.get('char_start', 0)
+                end = line.get('char_end', 0)
+                segment_text = text[start:end]
+                lid = line.get('line') or line.get('index') or 0
+                orig_segments.append({
+                    'id': f"line-{lid}",
+                    'label': f"Line {lid}",
+                    'start': start,
+                    'text': segment_text,
+                })
+    except Exception:
+        # Fallback: no segments
+        orig_segments = []
+
+    return render(request, 'breakdown/compare_split.html', {
+        'breakdown': breakdown,
+        'document': document,
+        'extraction_map': extraction_map,
+        'orig_segments': orig_segments,
+    })
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def run_ai_workflow(request, breakdown_id):
@@ -304,6 +366,29 @@ def run_ai_workflow(request, breakdown_id):
                     # Store step-by-step content separately
                     breakdown.step_by_step_content = result.get('step_by_step_data', {})
                 breakdown.raw_breakdown = result['raw_response']
+                # Persist/Update document-scoped HowTo
+                try:
+                    steps_payload = result.get('step_by_step_data', {}).get('sections', [])
+                    normalized_steps = []
+                    for i, sec in enumerate(steps_payload, start=1):
+                        if isinstance(sec, dict):
+                            normalized_steps.append({
+                                'title': sec.get('title') or f'Step {i}',
+                                'content': sec.get('content') or ''
+                            })
+                        else:
+                            normalized_steps.append({'title': f'Step {i}', 'content': str(sec)})
+                    howto, created = HowTo.objects.get_or_create(
+                        breakdown=breakdown,
+                        section=None,
+                        scope='document',
+                        defaults={'title': 'How to apply this document', 'steps': normalized_steps}
+                    )
+                    if not created:
+                        howto.steps = normalized_steps
+                        howto.save()
+                except Exception:
+                    pass
             else:
                 # For other workflows, save structured content
                 breakdown.content = result['breakdown']
@@ -331,6 +416,29 @@ def run_ai_workflow(request, breakdown_id):
                                 body=body,
                                 pointers=pointers,
                             )
+                        # Generate summaries
+                        try:
+                            # Document-level summary
+                            try:
+                                doc_summary = AIBreakdownService().summarize_document(
+                                    document.extracted_text
+                                )
+                                breakdown.document_summary = doc_summary
+                                breakdown.save()
+                            except Exception:
+                                pass
+                            # Section short summaries (cap to 15 to limit calls)
+                            svc = AIBreakdownService()
+                            for s in breakdown.sections.all().order_by('order')[:15]:
+                                try:
+                                    s.short_summary = svc.summarize_section(
+                                        s.title, s.body
+                                    )
+                                    s.save()
+                                except Exception:
+                                    continue
+                        except Exception:
+                            pass
                 except Exception:
                     # Non-fatal; keep raw content
                     pass
@@ -394,6 +502,271 @@ def _format_step_by_step_result(step_result):
             formatted_result += f"{section}\n\n"
     
     return formatted_result.strip()
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ask_question(request, breakdown_id):
+    """
+    Q&A endpoint. Body: { question, scope, section_id }
+    Returns: { success, answer, citations }
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    document = breakdown.document
+    try:
+        payload = json.loads(request.body or '{}')
+        question = payload.get('question', '').strip()
+        scope = payload.get('scope', 'section')
+        section_id = payload.get('section_id')
+        if not question:
+            return JsonResponse({'success': False, 'error': 'Question is required'}, status=400)
+
+        # Build context based on scope
+        context_text = ''
+        if scope == 'document':
+            context_text = document.extracted_text or ''
+        elif scope == 'neighbors' and section_id:
+            sec_qs = list(breakdown.sections.all().order_by('order'))
+            try:
+                idx = next(i for i, s in enumerate(sec_qs) if s.id == int(section_id))
+            except StopIteration:
+                idx = 0
+            neighbor_idxs = [i for i in [idx - 1, idx, idx + 1] if 0 <= i < len(sec_qs)]
+            parts = [sec_qs[i].body for i in neighbor_idxs]
+            context_text = "\n\n".join(parts)
+        elif section_id:
+            s = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+            context_text = s.body
+        else:
+            context_text = document.extracted_text or ''
+
+        # Compose prompt with citation requirement
+        prompt = (
+            "Answer the question concisely using ONLY the provided context. "
+            "Return JSON with fields: answer (string), citations (array of objects with char_start and optional page/index/line).\n\n"
+            "CONTEXT:\n" + context_text[:8000] + "\n\nQUESTION: " + question
+        )
+        ai = AIBreakdownService()
+        raw = ai._make_request(prompt) or ''
+        answer_text = ''
+        citations = []
+        try:
+            parsed = json.loads(raw)
+            answer_text = parsed.get('answer', '')
+            citations = parsed.get('citations', []) or []
+        except Exception:
+            answer_text = raw.strip()
+            citations = []
+
+        qa = QAEntry.objects.create(
+            breakdown=breakdown,
+            section=Section.objects.filter(id=section_id).first() if section_id else None,
+            scope=scope,
+            question=question,
+            answer=answer_text,
+            citations=citations,
+        )
+        return JsonResponse({'success': True, 'answer': answer_text, 'citations': citations, 'qa_id': qa.id})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def propose_section_update(request, breakdown_id, section_id):
+    """
+    Propose an AI-generated update for a section. Does NOT apply changes.
+
+    Body: { prompt }
+    Returns: { success, title, content }
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    data = json.loads(request.body or '{}')
+    user_prompt = (data.get('prompt') or '').strip()
+    base = (
+        "You are improving a section of a document. Rewrite the section content "
+        "to be clearer, more complete, and logically structured. Keep factual accuracy. "
+        "Return JSON only with fields {title, content}."
+    )
+    composed = (
+        f"{base}\n\nCURRENT TITLE:\n{section.title}\n\nCURRENT CONTENT:\n{section.body}\n\n"
+        f"USER INSTRUCTIONS:\n{user_prompt}"
+    )
+    try:
+        ai = AIBreakdownService()
+        raw = ai._make_request(composed) or ''
+        title, content = section.title, section.body
+        try:
+            parsed = json.loads(raw)
+            title = parsed.get('title') or title
+            content = parsed.get('content') or content
+        except Exception:
+            # Fallback: use raw text as content
+            content = raw.strip() or content
+        return JsonResponse({'success': True, 'title': title, 'content': content})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def apply_section_update(request, breakdown_id, section_id):
+    """
+    Apply an approved section update and sync `breakdown.content`.
+    Body: { title, content }
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    try:
+        data = json.loads(request.body or '{}')
+        title = (data.get('title') or section.title)[:255]
+        content = data.get('content') or section.body
+        # Create revision (proposed->accepted immediately since user clicked Apply)
+        Revision.objects.create(
+            breakdown=breakdown,
+            target_type='section',
+            target_id=section.id,
+            before={'title': section.title, 'content': section.body},
+            after={'title': title, 'content': content},
+            status='accepted',
+            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+        )
+        section.title = title
+        section.body = content
+        section.save()
+        # Rebuild breakdown.content from sections
+        rebuilt = []
+        for s in breakdown.sections.all().order_by('order'):
+            rebuilt.append({'title': s.title, 'content': s.body})
+        breakdown.content = {'sections': rebuilt}
+        breakdown.save()
+        return JsonResponse({'success': True, 'title': title, 'content': content})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def revert_section_revision(request, breakdown_id, section_id, revision_id):
+    """
+    Revert a section to the 'before' state of a given revision and record a new accepted revision.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    revision = get_object_or_404(Revision, id=revision_id, breakdown=breakdown)
+    # Ensure target matches
+    if revision.target_type != 'section' or int(revision.target_id) != int(section.id):
+        return JsonResponse({'success': False, 'error': 'Revision does not apply to this section'}, status=400)
+    try:
+        before_payload = revision.before or {}
+        new_title = (before_payload.get('title') or section.title)[:255]
+        new_content = before_payload.get('content') or section.body
+        # Record a new accepted revision capturing this revert
+        Revision.objects.create(
+            breakdown=breakdown,
+            target_type='section',
+            target_id=section.id,
+            before={'title': section.title, 'content': section.body},
+            after={'title': new_title, 'content': new_content},
+            status='accepted',
+            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+        )
+        # Apply change
+        section.title = new_title
+        section.body = new_content
+        section.save()
+        # Rebuild breakdown.content from sections
+        rebuilt = [{'title': s.title, 'content': s.body} for s in breakdown.sections.all().order_by('order')]
+        breakdown.content = {'sections': rebuilt}
+        breakdown.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def section_step_by_step(request, breakdown_id, section_id):
+    """
+    Generate step-by-step for a specific section and persist as section-scoped HowTo.
+    Body: { }
+    Returns: { success, steps }
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    guide_prompt = (
+        "Create a comprehensive, beginner-friendly, step-by-step guide that expands the content into actionable "
+        "instructions with: 1) direct download links (official sources), 2) exact commands for Windows PowerShell "
+        "and Linux/macOS (where applicable), 3) configuration file snippets, 4) verification checks, and 5) common "
+        "troubleshooting tips. Use clear headings, numbered steps, substeps, and include WHY each step matters. "
+        "Where possible, include both GUI and CLI paths. Format code blocks with proper fencing and label the shell "
+        "(powershell, bash). If the content requests a report or a word count (e.g., 600 words), generate a fluent, "
+        "no-fluff report instead, with numbered sections and image placeholders (e.g., \"Figure 1.1: …\"). Minimum "
+        "500 words unless a higher count is specified.\n\nCONTENT:\n" + section.body
+    )
+    try:
+        ai = AIBreakdownService()
+        raw = ai._make_request(guide_prompt) or ''
+        # Parse into steps using breakdown parser for consistency
+        parsed = ai._parse_breakdown_response(raw)
+        steps_payload = parsed.get('sections', [])
+        normalized_steps = []
+        for i, sec in enumerate(steps_payload, start=1):
+            if isinstance(sec, dict):
+                normalized_steps.append({'title': sec.get('title') or f'Step {i}', 'content': sec.get('content') or ''})
+            else:
+                normalized_steps.append({'title': f'Step {i}', 'content': str(sec)})
+        # Upsert section-scoped HowTo
+        howto, created = HowTo.objects.get_or_create(
+            breakdown=breakdown,
+            section=section,
+            scope='section',
+            defaults={'title': f'How to apply: {section.title}', 'steps': normalized_steps}
+        )
+        if not created:
+            howto.steps = normalized_steps
+            howto.title = f'How to apply: {section.title}'
+            howto.save()
+        return JsonResponse({'success': True, 'steps': normalized_steps})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def get_section(request, breakdown_id, section_id):
+    """
+    Return JSON for a single section and its how-tos to support AJAX refresh.
+    """
+    breakdown = get_object_or_404(Breakdown, id=breakdown_id)
+    section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
+    howtos = section.howtos.all()
+    return JsonResponse({
+        'success': True,
+        'section': {
+            'id': section.id,
+            'order': section.order,
+            'title': section.title,
+            'short_summary': section.short_summary,
+            'body': section.body,
+            'pointers': section.pointers,
+        },
+        'howtos': [
+            {
+                'title': h.title,
+                'steps': h.steps,
+            } for h in howtos
+        ],
+        'revisions': [
+            {
+                'id': rv.id,
+                'status': rv.status,
+                'created_at': rv.created_at.isoformat(),
+                'before': rv.before,
+                'after': rv.after,
+            } for rv in Revision.objects.filter(breakdown=breakdown, target_type='section', target_id=section.id).order_by('-created_at')[:10]
+        ],
+    })
 
 
 @csrf_exempt
@@ -901,6 +1274,7 @@ def save_document(request, breakdown_id):
         
         document_type = data.get('document_type')  # 'breakdown' or 'report'
         file_format = data.get('file_format')  # 'pdf' or 'docx'
+        custom_filename = (data.get('filename') or '').strip()
         
         if not all([document_type, file_format]):
             return JsonResponse({
@@ -913,11 +1287,17 @@ def save_document(request, breakdown_id):
         if '.' in original_name:
             original_name = original_name.rsplit('.', 1)[0]
         
-        # Create filename based on type
-        if document_type == 'breakdown':
-            filename = f"{original_name}_breakdown"
-        else:  # report
-            filename = f"{original_name}_report"
+        # Create filename based on type or use custom override (without extension)
+        if custom_filename:
+            import re as _re
+            base = _re.sub(r'[^A-Za-z0-9._\- ]+', '', custom_filename)
+            base = base.rsplit('.', 1)[0] if '.' in base else base
+            filename = base or (original_name + ("_report" if document_type != 'breakdown' else "_breakdown"))
+        else:
+            if document_type == 'breakdown':
+                filename = f"{original_name}_breakdown"
+            else:  # report
+                filename = f"{original_name}_report"
         
         # Add file extension
         if file_format == 'pdf':

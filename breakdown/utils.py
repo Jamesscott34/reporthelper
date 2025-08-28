@@ -49,6 +49,51 @@ def extract_text_from_file(file_path: str, file_type: str) -> str:
         raise
 
 
+def _fix_spaced_text(text: str) -> str:
+    """
+    Collapse artificially spaced letters (e.g., "C o n t e n t") into words.
+
+    Heuristic: For tokens that are a sequence of single letters separated by
+    single spaces and length >= 3, remove the spaces.
+    """
+    import re
+
+    def _collapse_token(token: str) -> str:
+        if re.fullmatch(r"(?:[A-Za-z]\s){2,}[A-Za-z]", token):
+            return token.replace(" ", "")
+        return token
+
+    # Process line by line to keep structure
+    fixed_lines: List[str] = []
+    for line in text.splitlines():
+        parts = line.split(" ")
+        fixed_parts = [_collapse_token(p) for p in parts]
+        fixed_lines.append(" ".join(fixed_parts))
+    return "\n".join(fixed_lines)
+
+
+def _filter_header_footer_lines(lines: List[str]) -> List[str]:
+    """
+    Remove common page headers/footers like "Page N" or de-spaced variants.
+    """
+    import re
+    filtered: List[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        plain = line.replace(" ", "")
+        if (
+            re.fullmatch(r"(?i)page\d+", plain)
+            or re.fullmatch(r"\d+page", plain)
+        ):
+            continue
+        if re.fullmatch(r"\d+", plain):  # bare page number
+            continue
+        filtered.append(raw)
+    return filtered
+
+
 def extract_text_with_pointers(
     file_path: str, file_type: str
 ) -> Tuple[str, Dict[str, Any]]:
@@ -118,7 +163,9 @@ def _extract_pdf_with_pointers(
             text_parts.append(header)
             cur += len(header)
             page_text = page.extract_text() or ''
-            lines = page_text.splitlines()
+            # Normalize spaced-out letters and remove common headers/footers
+            page_text = _fix_spaced_text(page_text)
+            lines = _filter_header_footer_lines(page_text.splitlines())
             line_ptrs: List[Dict[str, int]] = []
             for li, ln in enumerate(lines):
                 start = cur
@@ -241,9 +288,13 @@ def extract_text_from_pdf(file_path: str) -> str:
             pdf_reader = PyPDF2.PdfReader(file)
             print(f"PDF has {len(pdf_reader.pages)} pages")
             for i, page in enumerate(pdf_reader.pages):
-                page_text = page.extract_text()
-                if page_text:
-                    text += f"\n--- Page {i+1} ---\n{page_text}\n"
+                page_text = page.extract_text() or ''
+                # Normalize and filter
+                page_text = _fix_spaced_text(page_text)
+                lines = _filter_header_footer_lines(page_text.splitlines())
+                page_text_clean = "\n".join(lines)
+                if page_text_clean.strip():
+                    text += f"\n--- Page {i+1} ---\n{page_text_clean}\n"
                 else:
                     print(f"Warning: No text extracted from page {i+1}")
         text = text.strip()
