@@ -400,20 +400,7 @@ jobs:
         if [ -d "test_results" ]; then
           latest_run=$(ls -t test_results/ | head -n1)
           if [ -f "test_results/$latest_run/summary.json" ]; then
-            python3 << 'EOF'
-        import json
-        import os
-try:
-    with open(f'test_results/{os.listdir("test_results")[0]}/summary.json', 'r') as f:
-        results = json.load(f)
-    print(f"| Total Tests | {results.get('total_tests', 'N/A')} |")
-    print(f"| Passed | {results.get('passed_tests', 'N/A')} |")
-    print(f"| Failed | {results.get('failed_tests', 'N/A')} |")
-    print(f"| Skipped | {results.get('skipped_tests', 'N/A')} |")
-    print(f"| Duration | {results.get('duration', 'N/A')}s |")
-except:
-    print("| Status | ✅ Tests Completed |")
-EOF
+            echo "| Status | ✅ Tests Completed |"
           fi
         fi
 
