@@ -643,38 +643,36 @@ jobs:
         cp Makefile dist/ai-report-writer/
 
         # Create deployment scripts
-        cat > dist/ai-report-writer/deploy.sh << 'EOF'
-#!/bin/bash
-echo "🚀 AI Report Writer Deployment Script"
-echo "===================================="
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Setup environment
-cp .env.example .env
-echo "⚠️  Please configure your .env file with production settings"
-
-# Create directories
-mkdir -p logs media/documents staticfiles backups
-
-# Run migrations
-python manage.py migrate
-
-# Collect static files
-python manage.py collectstatic --noinput
-
-# Create superuser (optional)
-echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'changeme') if not User.objects.filter(username='admin').exists() else None" | python manage.py shell
-
-echo "✅ Deployment completed!"
-echo "🚀 Start with: python manage.py runserver"
-EOF
+        echo '#!/bin/bash' > dist/ai-report-writer/deploy.sh
+        echo 'echo "🚀 AI Report Writer Deployment Script"' >> dist/ai-report-writer/deploy.sh
+        echo 'echo "===================================="' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Create virtual environment' >> dist/ai-report-writer/deploy.sh
+        echo 'python3 -m venv venv' >> dist/ai-report-writer/deploy.sh
+        echo 'source venv/bin/activate' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Install dependencies' >> dist/ai-report-writer/deploy.sh
+        echo 'pip install --upgrade pip' >> dist/ai-report-writer/deploy.sh
+        echo 'pip install -r requirements.txt' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Setup environment' >> dist/ai-report-writer/deploy.sh
+        echo 'cp .env.example .env' >> dist/ai-report-writer/deploy.sh
+        echo 'echo "⚠️  Please configure your .env file with production settings"' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Create directories' >> dist/ai-report-writer/deploy.sh
+        echo 'mkdir -p logs media/documents staticfiles backups' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Run migrations' >> dist/ai-report-writer/deploy.sh
+        echo 'python manage.py migrate' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Collect static files' >> dist/ai-report-writer/deploy.sh
+        echo 'python manage.py collectstatic --noinput' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo '# Create superuser (optional)' >> dist/ai-report-writer/deploy.sh
+        echo 'echo "from django.contrib.auth.models import User; User.objects.create_superuser(\"admin\", \"admin@example.com\", \"changeme\") if not User.objects.filter(username=\"admin\").exists() else None" | python manage.py shell' >> dist/ai-report-writer/deploy.sh
+        echo '' >> dist/ai-report-writer/deploy.sh
+        echo 'echo "✅ Deployment completed!"' >> dist/ai-report-writer/deploy.sh
+        echo 'echo "🚀 Start with: python manage.py runserver"' >> dist/ai-report-writer/deploy.sh
         chmod +x dist/ai-report-writer/deploy.sh
 
         # Create archive
