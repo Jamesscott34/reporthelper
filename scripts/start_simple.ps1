@@ -2,12 +2,19 @@
 Write-Host "AI Report Writer - Simple Startup" -ForegroundColor Green
 Write-Host "=================================" -ForegroundColor Green
 
+# Change to project root directory
+Set-Location -Path ".."
+
 # Set virtual environment Python path
-$venvPython = "venv\Scripts\python.exe"
+$venvPython = ".venv\Scripts\python.exe"
+if (-not (Test-Path $venvPython)) {
+    $venvPython = "venv\Scripts\python.exe"
+}
 
 # Check if virtual environment exists
 if (-not (Test-Path $venvPython)) {
     Write-Host "ERROR: Virtual environment not found. Please run setup first." -ForegroundColor Red
+    Write-Host "INFO: Run 'python -m venv .venv' to create virtual environment" -ForegroundColor Yellow
     exit 1
 }
 
@@ -125,4 +132,4 @@ Write-Host ""
 
 # Start Django server
 Write-Host "INFO: Starting Django development server..." -ForegroundColor Green
-& $venvPython manage.py runserver 0.0.0.0:8000 
+& $venvPython manage.py runserver 0.0.0.0:8000

@@ -5,12 +5,14 @@ This module handles the communication with OpenRoute AI for breaking down docume
 into step-by-step instructions.
 """
 
-import requests
 import json
 import logging
 import re
+from typing import Any, Dict, List, Optional
+
 from django.conf import settings
-from typing import Dict, Any, Optional, List
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -19,56 +21,153 @@ class AIBreakdownService:
     """
     Service class for handling AI-powered document breakdown using OpenRoute AI.
     """
-    
+
     def __init__(self, model_name: str = None):
         """
         Initialize the AI breakdown service.
-        
+
         Args:
             model_name: Name of the OpenRoute AI model to use
         """
         self.host = settings.OPENROUTE_HOST
-        self.model = model_name or settings.OPENROUTE_MODELS['breakdown']
+        self.model = model_name or settings.OPENROUTE_MODELS["breakdown"]
         # Use OpenRoute AI's OpenAI-compatible endpoints
         self.chat_url = f"{self.host}/chat/completions"
         self.completions_url = f"{self.host}/completions"
         self.models_url = f"{self.host}/models"
-        
+
         # Determine which API key to use based on the model/provider
-        model_lower = (self.model or '').lower()
-        if 'deepseek' in model_lower:
-            self.api_key = settings.OPENROUTE_API_KEYS.get('deepseek', '')
-        elif 'tngtech' in model_lower:
-            self.api_key = settings.OPENROUTE_API_KEYS.get('tngtech', '')
-        elif 'openai/' in model_lower or model_lower.startswith('openai-'):
-            self.api_key = (
-                settings.OPENROUTE_API_KEYS.get('openai')
-                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
-            )
-        elif 'anthropic/' in model_lower or 'claude' in model_lower:
-            self.api_key = (
-                settings.OPENROUTE_API_KEYS.get('anthropic')
-                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
-            )
-        elif 'google/' in model_lower or 'gemini' in model_lower:
-            self.api_key = (
-                settings.OPENROUTE_API_KEYS.get('google')
-                or settings.OPENROUTE_API_KEYS.get('openrouter', '')
-            )
-        elif 'openrouter' in model_lower:
-            self.api_key = settings.OPENROUTE_API_KEYS.get('openrouter', '')
+        model_lower = (self.model or "").lower()
+        if "deepseek" in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get("deepseek", "")
+        elif "tngtech" in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get("tngtech", "")
+        elif "openai/" in model_lower or model_lower.startswith("openai-"):
+            self.api_key = settings.OPENROUTE_API_KEYS.get(
+                "openai"
+            ) or settings.OPENROUTE_API_KEYS.get("openrouter", "")
+        elif "anthropic/" in model_lower or "claude" in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get(
+                "anthropic"
+            ) or settings.OPENROUTE_API_KEYS.get("openrouter", "")
+        elif "google/" in model_lower or "gemini" in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get(
+                "google"
+            ) or settings.OPENROUTE_API_KEYS.get("openrouter", "")
+        elif "openrouter" in model_lower:
+            self.api_key = settings.OPENROUTE_API_KEYS.get("openrouter", "")
         else:
             # Default to OpenRouter key when provider is unknown
-            self.api_key = settings.OPENROUTE_API_KEYS.get('openrouter', '')
-    
+            self.api_key = settings.OPENROUTE_API_KEYS.get("openrouter", "")
+
+    def test_api_connectivity(self) -> Dict[str, Any]:
+        """
+        Test API connectivity with a simple request.
+
+        Returns:
+            Dict with 'success' boolean, 'message' string, and optional 'error' details
+        """
+        if not self.api_key:
+            return {
+                "success": False,
+                "message": "No API key configured. Please add your OpenRouter API key to .env file.",
+                "error": "missing_api_key",
+            }
+
+        try:
+            # Send a simple test message to verify API connectivity
+            test_payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Hello, this is a connectivity test. Please respond with 'OK'.",
+                    }
+                ],
+                "max_tokens": 10,
+                "temperature": 0.1,
+            }
+
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+
+            logger.info(f"Testing API connectivity with model: {self.model}")
+            response = requests.post(
+                self.chat_url, headers=headers, json=test_payload, timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    return {
+                        "success": True,
+                        "message": "API connectivity test successful",
+                        "model": self.model,
+                        "response": data["choices"][0]["message"]["content"],
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "API responded but with unexpected format",
+                        "error": "invalid_response_format",
+                    }
+
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": "API key is invalid or expired. Please update your OpenRouter API key in .env file.",
+                    "error": "invalid_api_key",
+                    "status_code": response.status_code,
+                }
+
+            elif response.status_code == 429:
+                return {
+                    "success": False,
+                    "message": "API rate limit exceeded. Please try again later or upgrade your OpenRouter plan.",
+                    "error": "rate_limit_exceeded",
+                    "status_code": response.status_code,
+                }
+
+            else:
+                return {
+                    "success": False,
+                    "message": f"API request failed with status {response.status_code}: {response.text}",
+                    "error": "api_request_failed",
+                    "status_code": response.status_code,
+                }
+
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "message": "API request timed out. Please check your internet connection.",
+                "error": "timeout",
+            }
+
+        except requests.exceptions.ConnectionError:
+            return {
+                "success": False,
+                "message": "Could not connect to OpenRouter API. Please check your internet connection.",
+                "error": "connection_error",
+            }
+
+        except Exception as e:
+            logger.error(f"API connectivity test failed: {str(e)}")
+            return {
+                "success": False,
+                "message": f"API connectivity test failed: {str(e)}",
+                "error": "unknown_error",
+            }
+
     def _make_request(self, prompt: str, max_retries: int = 3) -> Optional[str]:
         """
         Make a request to OpenRoute AI API with retry logic.
-        
+
         Args:
             prompt: The prompt to send to the AI model
             max_retries: Maximum number of retry attempts
-            
+
         Returns:
             The AI response or None if failed
         """
@@ -78,78 +177,83 @@ class AIBreakdownService:
             try:
                 logger.debug("Attempt %s/%s", attempt + 1, max_retries)
                 logger.debug("API Key present: %s", bool(self.api_key))
-                
+
                 # Use chat completions endpoint for better results
                 # Choose a conservative max_tokens to avoid 402 errors
                 budget = token_budgets[min(attempt, len(token_budgets) - 1)]
                 payload = {
                     "model": self.model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
+                    "messages": [{"role": "user", "content": prompt}],
                     "stream": False,
                     "temperature": 0.4,
                     "max_tokens": budget,
-                    "top_p": 0.9
+                    "top_p": 0.9,
                 }
-                
+
                 headers = {
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self.api_key}",
                     "HTTP-Referer": "http://localhost:8000",  # Required for OpenRoute
-                    "X-Title": "AI Report Writer"  # Optional but recommended
+                    "X-Title": "AI Report Writer",  # Optional but recommended
                 }
-                
+
                 logger.debug("POST %s model=%s", self.chat_url, self.model)
                 logger.debug("Payload size: %s chars", len(str(payload)))
-                
-                response = requests.post(self.chat_url, json=payload, headers=headers, timeout=120)
+
+                response = requests.post(
+                    self.chat_url, json=payload, headers=headers, timeout=120
+                )
                 logger.debug("Response status: %s", response.status_code)
-                
+
                 if not response.ok:
-                    logger.warning("HTTP error %s: %s", response.status_code, response.text)
+                    logger.warning(
+                        "HTTP error %s: %s", response.status_code, response.text
+                    )
                     response.raise_for_status()
-                
+
                 result = response.json()
                 logger.debug("Response JSON keys: %s", list(result.keys()))
-                
+
                 # Extract response from chat completions format
-                if 'choices' in result and len(result['choices']) > 0:
-                    response_text = result['choices'][0].get('message', {}).get('content', '')
+                if "choices" in result and len(result["choices"]) > 0:
+                    response_text = (
+                        result["choices"][0].get("message", {}).get("content", "")
+                    )
                 else:
                     # Fallback to completions format
-                    response_text = result.get('choices', [{}])[0].get('text', '')
-                
+                    response_text = result.get("choices", [{}])[0].get("text", "")
+
                 if response_text:
                     logger.debug("Received response len=%s", len(response_text))
                     return response_text
                 else:
                     logger.debug("Empty response on attempt %s", attempt + 1)
                     logger.debug("Full response: %s", result)
-                    
+
             except requests.exceptions.RequestException as e:
                 logger.warning("Request failed on attempt %s: %s", attempt + 1, e)
                 if attempt == max_retries - 1:
-                    logger.error(f"Failed to make request to OpenRoute AI after {max_retries} attempts: {e}")
+                    logger.error(
+                        f"Failed to make request to OpenRoute AI after {max_retries} attempts: {e}"
+                    )
                     return None
             except json.JSONDecodeError as e:
                 logger.warning("JSON decode failed on attempt %s: %s", attempt + 1, e)
                 if attempt == max_retries - 1:
-                    logger.error(f"Failed to parse OpenRoute AI response after {max_retries} attempts: {e}")
+                    logger.error(
+                        f"Failed to parse OpenRoute AI response after {max_retries} attempts: {e}"
+                    )
                     return None
-        
+
         return None
-    
+
     def run_freeform_prompt(self, prompt: str) -> Dict[str, Any]:
         """
         Send a freeform prompt to the configured AI model and return the raw text response.
-        
+
         Args:
             prompt: The complete prompt to send to the AI
-        
+
         Returns:
             Dict with success flag, response text (if any), and model name
         """
@@ -157,167 +261,175 @@ class AIBreakdownService:
             response_text = self._make_request(prompt)
             if response_text:
                 return {
-                    'success': True,
-                    'response': response_text,
-                    'model_used': self.model
+                    "success": True,
+                    "response": response_text,
+                    "model_used": self.model,
                 }
             return {
-                'success': False,
-                'error': 'Empty response from AI model',
-                'model_used': self.model
+                "success": False,
+                "error": "Empty response from AI model",
+                "model_used": self.model,
             }
         except Exception as exc:
             logger.error("Error running freeform prompt: %s", exc)
-            return {
-                'success': False,
-                'error': str(exc),
-                'model_used': self.model
-            }
+            return {"success": False, "error": str(exc), "model_used": self.model}
 
     def _load_step_by_step_prompt_template(self) -> Optional[str]:
         """
         Load the detailed step-by-step prompt template from the prompts folder.
-        Returns the template text or None if not found.
+                Returns the template text or None if not found.
         """
         try:
-            from django.conf import settings as dj_settings
             import os
+
+            from django.conf import settings as dj_settings
+
             template_path = os.path.join(
-                dj_settings.BASE_DIR, 'prompts', 'step_by_step_prompt.txt'
+                dj_settings.BASE_DIR, "prompts", "step_by_step_prompt.txt"
             )
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as exc:
-            logger.warning(
-                "Failed to load step-by-step prompt template: %s", str(exc)
-            )
+            logger.warning("Failed to load step-by-step prompt template: %s", str(exc))
             return None
-    
+
     def _check_models_available(self) -> bool:
         """
         Check if the required models are available in OpenRoute AI.
-        
+
         Returns:
             True if models are available, False otherwise
         """
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "HTTP-Referer": "http://localhost:8000"
+                "HTTP-Referer": "http://localhost:8000",
             }
             response = requests.get(self.models_url, headers=headers, timeout=10)
             if response.status_code == 200:
                 models = response.json()
-                available_models = [model.get('id', '') for model in models.get('data', [])]
+                available_models = [
+                    model.get("id", "") for model in models.get("data", [])
+                ]
                 logger.debug("Available models: %s", available_models)
                 return self.model in available_models
             return False
         except Exception as e:
             logger.warning("Error checking models: %s", e)
             return False
-    
+
     def breakdown_document(self, text: str) -> Dict[str, Any]:
         """
         Break down a document into step-by-step instructions.
-        
+
         Args:
             text: The extracted text from the document
-            
+
         Returns:
             Dictionary containing the breakdown and metadata
         """
-        logger.info("Starting AI breakdown: chars=%s model=%s host=%s api_key=%s",
-                    len(text), self.model, self.host, bool(self.api_key))
-        
+        logger.info(
+            "Starting AI breakdown: chars=%s model=%s host=%s api_key=%s",
+            len(text),
+            self.model,
+            self.host,
+            bool(self.api_key),
+        )
+
         # Check if models are available
         if not self._check_models_available():
             logger.warning("Model availability check failed, proceeding anyway")
-        
+
         # Clean and prepare the text
         cleaned_text = self._clean_text(text)
         logger.debug("Cleaned text length: %s", len(cleaned_text))
-        
+
         # Try different prompts for better results
         prompts = self._get_breakdown_prompts(cleaned_text)
         logger.debug("Generated %s prompts", len(prompts))
-        
+
         for i, prompt in enumerate(prompts):
             logger.debug("Trying prompt %s/%s len=%s", i + 1, len(prompts), len(prompt))
             response = self._make_request(prompt)
-            
+
             if response:
                 logger.debug("Got response from prompt %s len=%s", i + 1, len(response))
                 try:
                     breakdown_data = self._parse_breakdown_response(response)
-                    if breakdown_data and breakdown_data.get('sections'):
-                        logger.debug("Parsed breakdown with %s sections", len(breakdown_data['sections']))
+                    if breakdown_data and breakdown_data.get("sections"):
+                        logger.debug(
+                            "Parsed breakdown with %s sections",
+                            len(breakdown_data["sections"]),
+                        )
                         return {
-                            'success': True,
-                            'breakdown': breakdown_data,
-                            'raw_response': response,
-                            'model_used': self.model,
-                            'prompt_used': i + 1
+                            "success": True,
+                            "breakdown": breakdown_data,
+                            "raw_response": response,
+                            "model_used": self.model,
+                            "prompt_used": i + 1,
                         }
                 except Exception as e:
-                    logger.warning("Failed to parse response from prompt %s: %s", i + 1, e)
+                    logger.warning(
+                        "Failed to parse response from prompt %s: %s", i + 1, e
+                    )
                     continue
             else:
                 logger.debug("No response from prompt %s", i + 1)
-        
+
         # If all prompts fail, return a simple breakdown
         logger.warning("All prompts failed, creating simple breakdown")
         simple_breakdown = self._create_simple_breakdown(cleaned_text)
-        
+
         return {
-            'success': True,
-            'breakdown': simple_breakdown,
-            'raw_response': 'Simple breakdown created due to AI failure',
-            'model_used': self.model,
-            'prompt_used': 'fallback'
+            "success": True,
+            "breakdown": simple_breakdown,
+            "raw_response": "Simple breakdown created due to AI failure",
+            "model_used": self.model,
+            "prompt_used": "fallback",
         }
-    
+
     def _clean_text(self, text: str) -> str:
         """
         Clean and prepare text for AI processing.
-        
+
         Args:
             text: Raw text from document
-            
+
         Returns:
             Cleaned text
         """
         # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
-        
+        text = re.sub(r"\s+", " ", text)
+
         # Remove special characters that might confuse the AI
-        text = re.sub(r'[^\w\s\.\,\;\:\!\?\-\(\)\[\]]', '', text)
-        
+        text = re.sub(r"[^\w\s\.\,\;\:\!\?\-\(\)\[\]]", "", text)
+
         # Increase max length to handle longer documents
         max_length = 32000  # Increased from 8000 to handle longer documents
         if len(text) > max_length:
             # Instead of truncating, try to keep the most important parts
             # Keep the beginning and end, remove middle parts
-            first_part = text[:max_length//2]
-            last_part = text[-(max_length//2):]
+            first_part = text[: max_length // 2]
+            last_part = text[-(max_length // 2) :]
             text = first_part + "\n\n[Content continues...]\n\n" + last_part
             logger.debug("Document was truncated; new length=%s", len(text))
-        
+
         return text.strip()
-    
+
     def _get_breakdown_prompts(self, text: str) -> List[str]:
         """
         Generate multiple prompts for different breakdown approaches.
-        
+
         Args:
             text: Cleaned text from document
-            
+
         Returns:
             List of prompts to try
         """
         prompts = []
         # Determine target number of sections based on length
         target_sections = max(6, min(15, len(text) // 2500 or 6))
-        
+
         # Prompt 1: Comprehensive structured breakdown
         prompt1 = f"""You are a content breakdown assistant. Your task is to take a full document and break it down completely into clear, detailed step-by-step instructions.
 
@@ -398,25 +510,25 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
 
         # Prompt 4: Strict JSON schema to ensure machine-parsable output
         prompt4 = (
-            '{\n'
+            "{\n"
             '  "instruction": "Return ONLY valid JSON. No prose.",\n'
             '  "schema": {"sections": [{"title": "string", "content": "string"}]},\n'
             f'  "requirements": "Create at least {target_sections} sections covering ALL content. Titles must be concise; contents may use bullet lists.",\n'
             '  "sections": "Analyze the following document and output JSON with sections as specified.",\n'
             f'  "document": """{text}"""\n'
-            '}'
+            "}"
         )
 
         prompts.extend([prompt1, prompt2, prompt3, prompt4])
         return prompts
-    
+
     def _parse_breakdown_response(self, response: str) -> Dict[str, Any]:
         """
         Parse the AI response into structured data.
-        
+
         Args:
             response: Raw AI response
-            
+
         Returns:
             Structured breakdown data
         """
@@ -424,140 +536,179 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         try:
             maybe_json = response.strip()
             # Heuristic: find JSON block if wrapped in prose
-            if not maybe_json.startswith('{'):
+            if not maybe_json.startswith("{"):
                 import re as _re
+
                 match = _re.search(r"\{[\s\S]*\}\s*$", response)
                 if match:
                     maybe_json = match.group(0)
             data = json.loads(maybe_json)
-            if isinstance(data, dict) and isinstance(data.get('sections'), list):
+            if isinstance(data, dict) and isinstance(data.get("sections"), list):
                 # Ensure each section is a dict with title/content
                 normalized = []
-                for i, sec in enumerate(data['sections'], start=1):
+                for i, sec in enumerate(data["sections"], start=1):
                     if isinstance(sec, dict):
-                        title = sec.get('title') or f'Section {i}'
-                        content = sec.get('content') or ''
-                        normalized.append({'title': title, 'content': content})
+                        title = sec.get("title") or f"Section {i}"
+                        content = sec.get("content") or ""
+                        normalized.append({"title": title, "content": content})
                     else:
-                        normalized.append({'title': f'Section {i}', 'content': str(sec)})
+                        normalized.append(
+                            {"title": f"Section {i}", "content": str(sec)}
+                        )
                 return {
-                    'sections': normalized,
-                    'raw_response': response,
-                    'total_sections': len(normalized),
+                    "sections": normalized,
+                    "raw_response": response,
+                    "total_sections": len(normalized),
                 }
         except Exception:
             pass
 
         # Try to extract numbered sections
         sections = []
-        
+
         # Look for numbered patterns (1., 2., etc.) - more comprehensive pattern
-        numbered_pattern = r'(\d+\.\s*[^\n]+(?:\n(?!\d+\.)[^\n]*)*)'
-        numbered_matches = re.findall(numbered_pattern, response, re.MULTILINE | re.DOTALL)
-        
+        numbered_pattern = r"(\d+\.\s*[^\n]+(?:\n(?!\d+\.)[^\n]*)*)"
+        numbered_matches = re.findall(
+            numbered_pattern, response, re.MULTILINE | re.DOTALL
+        )
+
         if numbered_matches:
             for match in numbered_matches:
                 section_text = match.strip()
                 if len(section_text) > 10:  # Minimum section length
                     sections.append(section_text)
-        
+
         # If no numbered sections, try bullet points
         if not sections:
-            bullet_pattern = r'([•\-\*]\s*[^\n]+(?:\n(?![\•\-\*])[^\n]*)*)'
-            bullet_matches = re.findall(bullet_pattern, response, re.MULTILINE | re.DOTALL)
-            
+            bullet_pattern = r"([•\-\*]\s*[^\n]+(?:\n(?![\•\-\*])[^\n]*)*)"
+            bullet_matches = re.findall(
+                bullet_pattern, response, re.MULTILINE | re.DOTALL
+            )
+
             for match in bullet_matches:
                 section_text = match.strip()
                 if len(section_text) > 10:
                     sections.append(section_text)
-        
+
         # If still no sections, split by paragraphs or lines that look like sections
         if not sections:
             # Look for lines that start with common section indicators
-            section_indicators = ['Overview', 'Introduction', 'Background', 'Methodology', 'Results', 'Conclusion', 'Summary', 'Analysis', 'Implementation', 'Features', 'Architecture', 'Design', 'Development', 'Testing', 'Deployment']
-            
-            lines = response.split('\n')
+            section_indicators = [
+                "Overview",
+                "Introduction",
+                "Background",
+                "Methodology",
+                "Results",
+                "Conclusion",
+                "Summary",
+                "Analysis",
+                "Implementation",
+                "Features",
+                "Architecture",
+                "Design",
+                "Development",
+                "Testing",
+                "Deployment",
+            ]
+
+            lines = response.split("\n")
             current_section = ""
-            
+
             for line in lines:
                 line = line.strip()
-                if any(indicator.lower() in line.lower() for indicator in section_indicators) and len(line) > 5:
+                if (
+                    any(
+                        indicator.lower() in line.lower()
+                        for indicator in section_indicators
+                    )
+                    and len(line) > 5
+                ):
                     if current_section:
                         sections.append(current_section.strip())
                     current_section = line
                 elif line and current_section:
                     current_section += "\n" + line
-            
+
             if current_section:
                 sections.append(current_section.strip())
-        
+
         # If still no sections, split by paragraphs
         if not sections:
             paragraphs = [
-                p.strip() for p in response.split('\n\n')
+                p.strip()
+                for p in response.split("\n\n")
                 if p.strip() and len(p.strip()) > 40
             ]
             # Convert to structured dicts with synthetic titles
             tmp = []
             for i, p in enumerate(paragraphs[:15], start=1):
-                first_line = p.split('\n', 1)[0]
-                title = (first_line[:80] + '...') if len(first_line) > 80 else first_line
-                tmp.append({'title': f'Section {i}: {title}', 'content': p})
+                first_line = p.split("\n", 1)[0]
+                title = (
+                    (first_line[:80] + "...") if len(first_line) > 80 else first_line
+                )
+                tmp.append({"title": f"Section {i}: {title}", "content": p})
             if tmp:
                 sections = tmp
-        
+
         # Ensure we have at least some content
         if not sections:
             fallback = response[:1000] + "..." if len(response) > 1000 else response
-            sections = [{'title': 'Section 1', 'content': fallback}]
-        
+            sections = [{"title": "Section 1", "content": fallback}]
+
         # If sections are strings, normalize to dicts
         normalized_sections = []
         for i, sec in enumerate(sections, start=1):
             if isinstance(sec, dict):
                 normalized_sections.append(
-                    {'title': sec.get('title') or f'Section {i}', 'content': sec.get('content') or ''}
+                    {
+                        "title": sec.get("title") or f"Section {i}",
+                        "content": sec.get("content") or "",
+                    }
                 )
             else:
-                normalized_sections.append({'title': f'Section {i}', 'content': str(sec)})
+                normalized_sections.append(
+                    {"title": f"Section {i}", "content": str(sec)}
+                )
 
         return {
-            'sections': normalized_sections,
-            'raw_response': response,
-            'total_sections': len(normalized_sections)
+            "sections": normalized_sections,
+            "raw_response": response,
+            "total_sections": len(normalized_sections),
         }
-    
+
     def _create_simple_breakdown(self, text: str) -> Dict[str, Any]:
         """
         Create a simple breakdown when AI fails.
-        
+
         Args:
             text: Cleaned text from document
-            
+
         Returns:
             Simple breakdown structure
         """
         # Split text into paragraphs
-        paragraphs = [p.strip() for p in text.split('\n') if p.strip() and len(p.strip()) > 50]
-        
+        paragraphs = [
+            p.strip() for p in text.split("\n") if p.strip() and len(p.strip()) > 50
+        ]
+
         # Create simple sections
         sections = []
         for i, paragraph in enumerate(paragraphs[:8]):  # Limit to 8 sections
             sections.append(f"{i+1}. {paragraph[:200]}...")
-        
+
         return {
-            'sections': sections,
-            'raw_response': 'Simple breakdown created automatically',
-            'total_sections': len(sections)
+            "sections": sections,
+            "raw_response": "Simple breakdown created automatically",
+            "total_sections": len(sections),
         }
-    
+
     def create_step_by_step_guide(self, breakdown_content: str) -> Dict[str, Any]:
         """
         Create comprehensive step-by-step instructions using the same approach as breakdown.
-        
+
         Args:
             breakdown_content: The breakdown content to convert to detailed steps
-            
+
         Returns:
             A comprehensive step-by-step guide structure with subsections
         """
@@ -565,16 +716,16 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         template = self._load_step_by_step_prompt_template()
         if template:
             # Enforce auto-example and output-only policy for backend generation too
-            prompt = template.replace('{INPUT_TEXT}', breakdown_content)
+            prompt = template.replace("{INPUT_TEXT}", breakdown_content)
         else:
             # Minimal fallback (kept short to satisfy linters)
             prompt = (
-                'Create a beginner-friendly, step-by-step guide with numbered '
-                'steps, short explanations of why, and commands for Windows '
-                '(PowerShell) and Linux/macOS (bash). Include verification '
-                'checks, troubleshooting tips, config snippets, and official '
-                'download links when relevant. Use markdown headings.\n\n'
-                f'Input:\n{breakdown_content}'
+                "Create a beginner-friendly, step-by-step guide with numbered "
+                "steps, short explanations of why, and commands for Windows "
+                "(PowerShell) and Linux/macOS (bash). Include verification "
+                "checks, troubleshooting tips, config snippets, and official "
+                "download links when relevant. Use markdown headings.\n\n"
+                f"Input:\n{breakdown_content}"
             )
 
         try:
@@ -585,52 +736,52 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         except Exception as e:
             logger.error("Error creating step-by-step guide: %s", e)
             return self._create_simple_step_by_step(breakdown_content)
-    
+
     def _create_simple_step_by_step(self, content: str) -> Dict[str, Any]:
         """
         Create simple step-by-step instructions when AI fails.
-        
+
         Args:
             content: The content to break into steps
-            
+
         Returns:
             Simple step-by-step structure
         """
         # Split content into logical steps
-        sentences = [s.strip() for s in content.split('.') if s.strip()]
-        
+        sentences = [s.strip() for s in content.split(".") if s.strip()]
+
         steps = []
         for i, sentence in enumerate(sentences[:5]):  # Limit to 5 steps
             if len(sentence) > 20:  # Only include substantial sentences
                 # Make it more action-oriented
-                action = sentence.split()[0] if sentence.split() else 'Review'
-                steps.append({
-                    'title': f'Step {i + 1}: {action.title()}',
-                    'content': sentence
-                })
-        
+                action = sentence.split()[0] if sentence.split() else "Review"
+                steps.append(
+                    {"title": f"Step {i + 1}: {action.title()}", "content": sentence}
+                )
+
         return {
-            'sections': steps,
-            'raw_response': 'Simple step-by-step guide created automatically',
-            'total_sections': len(steps)
+            "sections": steps,
+            "raw_response": "Simple step-by-step guide created automatically",
+            "total_sections": len(steps),
         }
-    
-    def create_detailed_report(self, extracted_text: str, 
-                              breakdown_content: str) -> Dict[str, Any]:
+
+    def create_detailed_report(
+        self, extracted_text: str, breakdown_content: str
+    ) -> Dict[str, Any]:
         """
-        Create a comprehensive, detailed report reviewing the extracted 
+        Create a comprehensive, detailed report reviewing the extracted
         text and breakdown.
-        
+
         Args:
             extracted_text: The original extracted text from the document
             breakdown_content: The AI-generated breakdown content
-            
+
         Returns:
-            A detailed report structure with references and image 
+            A detailed report structure with references and image
             placeholders
         """
         prompt = f"""
-        Create a comprehensive, detailed report based on the following 
+        Create a comprehensive, detailed report based on the following
         information:
 
         EXTRACTED TEXT:
@@ -640,24 +791,24 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         {breakdown_content[:2000]}
 
         REQUIREMENTS:
-        1. Create a professional, detailed report with no fluff or 
+        1. Create a professional, detailed report with no fluff or
            repetition
         2. Remove all markdown formatting (no **, *, "", etc.)
-        3. Break down each part into clear, detailed sections with 
+        3. Break down each part into clear, detailed sections with
            proper numbering
-        4. Add reference numbers to each major section (e.g., 1.0, 
+        4. Add reference numbers to each major section (e.g., 1.0,
            1.1, 1.2, 2.0, etc.)
-        5. Include image placeholders where relevant with descriptive 
-           names (e.g., "Figure 1.1: Process Flow Diagram", "Image 2.3: 
+        5. Include image placeholders where relevant with descriptive
+           names (e.g., "Figure 1.1: Process Flow Diagram", "Image 2.3:
            Data Structure Overview")
         6. Make the report fluid and well-structured with logical flow
         7. Focus on what was accomplished and the methodology used
         8. Include a summary of findings and recommendations
         9. Add cross-references between sections where appropriate
         10. Use clear, professional language without unnecessary jargon
-        11. Length requirement: If the input explicitly requests a word count, 
-            meet or exceed that amount. Otherwise, produce no fewer than 500 words. 
-            Do not pad with filler; expand with concrete details, reasoning, and 
+        11. Length requirement: If the input explicitly requests a word count,
+            meet or exceed that amount. Otherwise, produce no fewer than 500 words.
+            Do not pad with filler; expand with concrete details, reasoning, and
             examples tied to the input.
 
         STRUCTURE:
@@ -683,127 +834,132 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         - Do not restate these instructions or the input headers; output only the
           final report content that satisfies all requirements.
 
-        Format the response as a structured report with sections 
-        containing title and content. Each section should be 
+        Format the response as a structured report with sections
+        containing title and content. Each section should be
         comprehensive and well-detailed.
         """
-        
+
         try:
             response = self._make_request(prompt)
             if response:
                 return self._parse_report_response(response)
             else:
-                return self._create_simple_report(extracted_text, 
-                                                breakdown_content)
+                return self._create_simple_report(extracted_text, breakdown_content)
         except Exception as e:
             logger.error(f"Error creating detailed report: {e}")
-            return self._create_simple_report(extracted_text, 
-                                            breakdown_content)
-    
+            return self._create_simple_report(extracted_text, breakdown_content)
+
     def _parse_report_response(self, response: str) -> Dict[str, Any]:
         """
         Parse the AI-generated report response into structured format.
-        
+
         Args:
             response: The AI response to parse
-            
+
         Returns:
             Parsed report structure
         """
         try:
             # Clean the response
             cleaned_response = self._clean_text(response)
-            
+
             # Split into sections based on headers
             sections = []
             current_section = None
             current_content = []
-            
-            lines = cleaned_response.split('\n')
+
+            lines = cleaned_response.split("\n")
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
-                
+
                 # Check if this is a new section header
-                if re.match(r'^\d+\.\s+', line) or re.match(r'^\d+\.\d+\s+', line) or line.isupper():
+                if (
+                    re.match(r"^\d+\.\s+", line)
+                    or re.match(r"^\d+\.\d+\s+", line)
+                    or line.isupper()
+                ):
                     # Save previous section if exists
                     if current_section:
-                        sections.append({
-                            'title': current_section,
-                            'content': '\n'.join(current_content).strip()
-                        })
-                    
+                        sections.append(
+                            {
+                                "title": current_section,
+                                "content": "\n".join(current_content).strip(),
+                            }
+                        )
+
                     # Start new section
                     current_section = line
                     current_content = []
                 else:
                     if current_section:
                         current_content.append(line)
-            
+
             # Add the last section
             if current_section and current_content:
-                sections.append({
-                    'title': current_section,
-                    'content': '\n'.join(current_content).strip()
-                })
-            
+                sections.append(
+                    {
+                        "title": current_section,
+                        "content": "\n".join(current_content).strip(),
+                    }
+                )
+
             # Ensure we have at least some content; do not truncate so the UI shows everything
             if not sections:
-                sections = [{
-                    'title': 'Report Summary',
-                    'content': cleaned_response
-                }]
-            
+                sections = [{"title": "Report Summary", "content": cleaned_response}]
+
             return {
-                'sections': sections,
-                'raw_response': cleaned_response,
-                'total_sections': len(sections)
+                "sections": sections,
+                "raw_response": cleaned_response,
+                "total_sections": len(sections),
             }
-            
+
         except Exception as e:
             logger.error(f"Error parsing report response: {e}")
             return {
-                'sections': [{'title': 'Report', 'content': response}],
-                'raw_response': response,
-                'total_sections': 1
+                "sections": [{"title": "Report", "content": response}],
+                "raw_response": response,
+                "total_sections": 1,
             }
-    
-    def _create_simple_report(self, extracted_text: str, breakdown_content: str) -> Dict[str, Any]:
+
+    def _create_simple_report(
+        self, extracted_text: str, breakdown_content: str
+    ) -> Dict[str, Any]:
         """
         Create a simple report when AI fails.
-        
+
         Args:
             extracted_text: The original extracted text
             breakdown_content: The breakdown content
-            
+
         Returns:
             Simple report structure
         """
         sections = [
             {
-                'title': '1.0 Executive Summary',
-                'content': f'This report summarizes the analysis of the document containing {len(extracted_text)} characters of text.'
+                "title": "1.0 Executive Summary",
+                "content": f"This report summarizes the analysis of the document containing {len(extracted_text)} characters of text.",
             },
             {
-                'title': '2.0 Document Analysis',
-                'content': f'The document was processed and broken down into {len(breakdown_content.split())} words of structured content.'
+                "title": "2.0 Document Analysis",
+                "content": f"The document was processed and broken down into {len(breakdown_content.split())} words of structured content.",
             },
             {
-                'title': '3.0 Key Findings',
-                'content': 'The document contains valuable information that has been organized into actionable sections for better understanding and implementation.'
+                "title": "3.0 Key Findings",
+                "content": "The document contains valuable information that has been organized into actionable sections for better understanding and implementation.",
             },
             {
-                'title': '4.0 Recommendations',
-                'content': 'Consider implementing the structured breakdown to improve workflow efficiency and understanding of the document content.'
-            }
+                "title": "4.0 Recommendations",
+                "content": "Consider implementing the structured breakdown to improve workflow efficiency and understanding of the document content.",
+            },
         ]
-        
+
         return {
-            'sections': sections,
-            'raw_response': 'Simple report created automatically',
-            'total_sections': len(sections)
-        } 
+            "sections": sections,
+            "raw_response": "Simple report created automatically",
+            "total_sections": len(sections),
+        }
 
     def summarize_document(self, text: str) -> str:
         """
@@ -821,8 +977,7 @@ Provide a comprehensive breakdown that covers EVERYTHING in the document:"""
         """
         prompt = (
             "Summarize the following document in 3-5 concise sentences, "
-            "covering the main purpose, key points, and conclusions.\n\n"
-            + text
+            "covering the main purpose, key points, and conclusions.\n\n" + text
         )
         try:
             resp = self._make_request(prompt)

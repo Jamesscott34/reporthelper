@@ -37,14 +37,9 @@ flower>=2.0.1
 pytest>=7.4.0
 pytest-django>=4.7.0
 pytest-cov>=4.1.0
+pytest-asyncio>=0.21.1
 factory-boy>=3.3.0
 coverage>=7.3.0
-
-# Code quality and formatting
-black>=23.9.0
-flake8>=6.1.0
-isort>=5.12.0
-pre-commit>=3.5.0
 
 # Security and authentication
 django-allauth>=0.57.0
@@ -54,6 +49,12 @@ django-oauth-toolkit>=2.3.0
 djangorestframework>=3.14.0
 django-cors-headers>=4.3.0
 drf-yasg>=1.21.0
+
+# Real-time and WebSocket support (MVP Phase 1)
+channels>=4.3.0
+channels-redis>=4.3.0
+drf-nested-routers>=0.93.4
+daphne>=4.0.0
 
 # Database and caching
 psycopg2-binary>=2.9.7
@@ -72,4 +73,20 @@ django-storages>=1.14.0
 # Additional utilities
 python-dateutil>=2.8.2
 pytz>=2023.3
-six>=1.16.0 
+six>=1.16.0
+
+# Development and code quality tools
+black>=23.9.0
+isort>=5.12.0
+flake8>=6.1.0
+flake8-django>=1.4.0
+flake8-docstrings>=1.7.0
+mypy>=1.17.0
+django-stubs>=5.2.0
+bandit>=1.8.0
+pre-commit>=4.3.0
+detect-secrets>=1.4.0
+django-upgrade>=1.15.0
+pydocstyle>=6.3.0
+safety>=3.0.0
+pbr

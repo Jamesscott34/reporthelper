@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    migrations
+    | venv
+    | env
+    | .venv
+    | .env
+    | node_modules
+    | .git
+    | __pycache__
+    | .pytest_cache
+    | .mypy_cache
+    | build
+    | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_django = "django"
+known_first_party = ["breakdown", "ai_report_writer"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip = ["migrations", "venv", ".venv", "env", "node_modules"]
+skip_glob = ["**/migrations/*.py"]
+
+[tool.mypy]
+python_version = "3.9"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = ["mypy_django_plugin.main"]
+
+[[tool.mypy.overrides]]
+module = "breakdown.migrations.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.django-stubs]
+django_settings_module = "ai_report_writer.settings"
+
+[tool.bandit]
+exclude_dirs = ["tests", "*/migrations/*", "venv", ".venv"]
+skips = ["B101", "B601"]  # Skip assert_used and shell=True warnings in tests
+
+[tool.coverage.run]
+source = "."
+omit = [
+    "*/migrations/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/env/*",
+    "manage.py",
+    "*/settings/*",
+    "*/tests/*",
+    "*test*",
+    "*/node_modules/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "class .*\\(Protocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

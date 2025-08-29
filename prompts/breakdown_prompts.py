@@ -6,10 +6,10 @@ This module contains specialized prompts for different types of document breakdo
 
 # Base prompts for different document types
 BREAKDOWN_PROMPTS = {
-    'general': [
+    "general": [
         {
-            'name': 'structured_breakdown',
-            'prompt': """You are a content breakdown assistant. Your task is to take a full document and break it down clearly step-by-step.
+            "name": "structured_breakdown",
+            "prompt": """You are a content breakdown assistant. Your task is to take a full document and break it down clearly step-by-step.
 
 Use numbered or bullet point format. Avoid AI tone. Keep it clear, short, and professional.
 
@@ -23,11 +23,11 @@ Now, analyze the following text and create a structured breakdown:
 
 {text}
 
-Please provide a clear, structured breakdown with numbered sections:"""
+Please provide a clear, structured breakdown with numbered sections:""",
         },
         {
-            'name': 'detailed_analysis',
-            'prompt': """Analyze this document and create a comprehensive step-by-step breakdown.
+            "name": "detailed_analysis",
+            "prompt": """Analyze this document and create a comprehensive step-by-step breakdown.
 
 Requirements:
 - Use clear, numbered sections
@@ -39,11 +39,11 @@ Requirements:
 Document content:
 {text}
 
-Create a detailed breakdown:"""
+Create a detailed breakdown:""",
         },
         {
-            'name': 'executive_summary',
-            'prompt': """Create an executive summary breakdown of this document.
+            "name": "executive_summary",
+            "prompt": """Create an executive summary breakdown of this document.
 
 Format:
 1. Overview: Main purpose and scope
@@ -55,13 +55,13 @@ Format:
 Document:
 {text}
 
-Provide an executive summary breakdown:"""
-        }
+Provide an executive summary breakdown:""",
+        },
     ],
-    'step_by_step': [
+    "step_by_step": [
         {
-            'name': 'detailed_steps_links_commands',
-            'prompt': """You are an expert technical writing assistant. Transform the provided text into a clear, beginner-friendly, step-by-step guide that greatly expands the original.
+            "name": "detailed_steps_links_commands",
+            "prompt": """You are an expert technical writing assistant. Transform the provided text into a clear, beginner-friendly, step-by-step guide that greatly expands the original.
 
 Primary goal
 - Turn complex content into a comprehensive how-to with numbered steps and practical actions anyone can follow.
@@ -91,14 +91,13 @@ SECTION: {section}
 
 CONTENT:
 {text}
-"""
+""",
         }
     ],
-
-    'academic': [
+    "academic": [
         {
-            'name': 'research_paper',
-            'prompt': """Break down this academic research paper into clear sections.
+            "name": "research_paper",
+            "prompt": """Break down this academic research paper into clear sections.
 
 Expected structure:
 1. Abstract: Main research question and findings
@@ -112,11 +111,11 @@ Expected structure:
 Research paper content:
 {text}
 
-Create an academic breakdown:"""
+Create an academic breakdown:""",
         },
         {
-            'name': 'thesis_dissertation',
-            'prompt': """Analyze this thesis or dissertation and create a comprehensive breakdown.
+            "name": "thesis_dissertation",
+            "prompt": """Analyze this thesis or dissertation and create a comprehensive breakdown.
 
 Structure:
 1. Research Problem: Main question being addressed
@@ -129,14 +128,13 @@ Structure:
 Thesis content:
 {text}
 
-Provide a thesis breakdown:"""
-        }
+Provide a thesis breakdown:""",
+        },
     ],
-
-    'business': [
+    "business": [
         {
-            'name': 'business_report',
-            'prompt': """Break down this business report into actionable sections.
+            "name": "business_report",
+            "prompt": """Break down this business report into actionable sections.
 
 Structure:
 1. Executive Summary: Key findings and recommendations
@@ -148,11 +146,11 @@ Structure:
 Business report content:
 {text}
 
-Create a business breakdown:"""
+Create a business breakdown:""",
         },
         {
-            'name': 'project_proposal',
-            'prompt': """Analyze this project proposal and create a structured breakdown.
+            "name": "project_proposal",
+            "prompt": """Analyze this project proposal and create a structured breakdown.
 
 Sections:
 1. Project Overview: Purpose and objectives
@@ -165,14 +163,13 @@ Sections:
 Proposal content:
 {text}
 
-Provide a project breakdown:"""
-        }
+Provide a project breakdown:""",
+        },
     ],
-
-    'technical': [
+    "technical": [
         {
-            'name': 'technical_documentation',
-            'prompt': """Break down this technical documentation into clear sections.
+            "name": "technical_documentation",
+            "prompt": """Break down this technical documentation into clear sections.
 
 Structure:
 1. Overview: Purpose and scope
@@ -185,11 +182,11 @@ Structure:
 Technical content:
 {text}
 
-Create a technical breakdown:"""
+Create a technical breakdown:""",
         },
         {
-            'name': 'user_manual',
-            'prompt': """Analyze this user manual and create a step-by-step breakdown.
+            "name": "user_manual",
+            "prompt": """Analyze this user manual and create a step-by-step breakdown.
 
 Sections:
 1. Getting Started: Initial setup and installation
@@ -201,16 +198,16 @@ Sections:
 Manual content:
 {text}
 
-Provide a user manual breakdown:"""
-        }
-    ]
+Provide a user manual breakdown:""",
+        },
+    ],
 }
 
 # Specialized prompts for specific content types
 SPECIALIZED_PROMPTS = {
-    'code_documentation': {
-        'name': 'code_analysis',
-        'prompt': """Analyze this code documentation and create a technical breakdown.
+    "code_documentation": {
+        "name": "code_analysis",
+        "prompt": """Analyze this code documentation and create a technical breakdown.
 
 Structure:
 1. Overview: Purpose and functionality
@@ -223,12 +220,11 @@ Structure:
 Code documentation:
 {text}
 
-Create a code documentation breakdown:"""
+Create a code documentation breakdown:""",
     },
-
-    'legal_document': {
-        'name': 'legal_analysis',
-        'prompt': """Break down this legal document into clear sections.
+    "legal_document": {
+        "name": "legal_analysis",
+        "prompt": """Break down this legal document into clear sections.
 
 Structure:
 1. Parties: Who is involved
@@ -241,12 +237,11 @@ Structure:
 Legal document content:
 {text}
 
-Provide a legal document breakdown:"""
+Provide a legal document breakdown:""",
     },
-
-    'medical_report': {
-        'name': 'medical_analysis',
-        'prompt': """Analyze this medical report and create a structured breakdown.
+    "medical_report": {
+        "name": "medical_analysis",
+        "prompt": """Analyze this medical report and create a structured breakdown.
 
 Structure:
 1. Patient Information: Demographics and history
@@ -259,11 +254,12 @@ Structure:
 Medical report content:
 {text}
 
-Create a medical report breakdown:"""
-    }
+Create a medical report breakdown:""",
+    },
 }
 
-def get_prompts_for_content(text: str, content_type: str = 'general') -> list:
+
+def get_prompts_for_content(text: str, content_type: str = "general") -> list:
     """
     Get appropriate prompts based on content type and text analysis.
 
@@ -281,32 +277,61 @@ def get_prompts_for_content(text: str, content_type: str = 'general') -> list:
         prompts.extend(BREAKDOWN_PROMPTS[content_type])
 
     # Add general prompts as fallback
-    if content_type != 'general':
-        prompts.extend(BREAKDOWN_PROMPTS['general'])
+    if content_type != "general":
+        prompts.extend(BREAKDOWN_PROMPTS["general"])
 
     # Add specialized prompts based on content analysis
     if _contains_code(text):
-        prompts.append(SPECIALIZED_PROMPTS['code_documentation'])
+        prompts.append(SPECIALIZED_PROMPTS["code_documentation"])
 
     if _contains_legal_terms(text):
-        prompts.append(SPECIALIZED_PROMPTS['legal_document'])
+        prompts.append(SPECIALIZED_PROMPTS["legal_document"])
 
     if _contains_medical_terms(text):
-        prompts.append(SPECIALIZED_PROMPTS['medical_report'])
+        prompts.append(SPECIALIZED_PROMPTS["medical_report"])
 
     return prompts
 
+
 def _contains_code(text: str) -> bool:
     """Check if text contains code-like content."""
-    code_indicators = ['def ', 'class ', 'function', 'import ', 'var ', 'const ', 'public ', 'private ']
+    code_indicators = [
+        "def ",
+        "class ",
+        "function",
+        "import ",
+        "var ",
+        "const ",
+        "public ",
+        "private ",
+    ]
     return any(indicator in text.lower() for indicator in code_indicators)
+
 
 def _contains_legal_terms(text: str) -> bool:
     """Check if text contains legal terminology."""
-    legal_terms = ['whereas', 'hereby', 'party', 'agreement', 'contract', 'terms', 'conditions', 'liability']
+    legal_terms = [
+        "whereas",
+        "hereby",
+        "party",
+        "agreement",
+        "contract",
+        "terms",
+        "conditions",
+        "liability",
+    ]
     return any(term in text.lower() for term in legal_terms)
+
 
 def _contains_medical_terms(text: str) -> bool:
     """Check if text contains medical terminology."""
-    medical_terms = ['diagnosis', 'treatment', 'patient', 'symptoms', 'medication', 'prescription', 'clinical']
+    medical_terms = [
+        "diagnosis",
+        "treatment",
+        "patient",
+        "symptoms",
+        "medication",
+        "prescription",
+        "clinical",
+    ]
     return any(term in text.lower() for term in medical_terms)

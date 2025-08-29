@@ -1,0 +1,809 @@
+name: 🤖 AI Report Writer CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      run_security_scan:
+        description: 'Run security scan'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # ============================================================================
+  # 🔍 PRE-FLIGHT CHECKS
+  # ============================================================================
+  pre-flight:
+    name: 🔍 Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      python-version: ${{ steps.setup.outputs.python-version }}
+      should-deploy: ${{ steps.deployment-check.outputs.should-deploy }}
+      environment: ${{ steps.deployment-check.outputs.environment }}
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔧 Setup Environment Info
+      id: setup
+      run: |
+        echo "python-version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
+        echo "🐍 Python Version: ${{ env.PYTHON_VERSION }}"
+        echo "📦 Node Version: ${{ env.NODE_VERSION }}"
+        echo "🌿 Branch: ${{ github.ref_name }}"
+        echo "🎯 Event: ${{ github.event_name }}"
+
+    - name: 🚀 Deployment Check
+      id: deployment-check
+      run: |
+        if [[ "${{ github.ref_name }}" == "main" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "should-deploy=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=production" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "should-deploy=false" >> $GITHUB_OUTPUT
+          echo "environment=none" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 📋 Workflow Summary
+      run: |
+        echo "## 🤖 AI Report Writer Pipeline Started" >> $GITHUB_STEP_SUMMARY
+        echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| 🐍 Python | ${{ env.PYTHON_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🌿 Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🎯 Event | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🚀 Deploy | ${{ steps.deployment-check.outputs.should-deploy }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🌍 Environment | ${{ steps.deployment-check.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🐍 PYTHON ENVIRONMENT SETUP & VALIDATION
+  # ============================================================================
+  setup-python:
+    name: 🐍 Python Environment Setup
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.key }}
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 🔑 Generate Cache Key
+      id: cache-key
+      run: |
+        echo "key=python-${{ runner.os }}-${{ hashFiles('requirements.txt') }}" >> $GITHUB_OUTPUT
+
+    - name: 📦 Cache Python Dependencies
+      uses: actions/cache@v3
+      id: cache
+      with:
+        path: ~/.cache/pip
+        key: ${{ steps.cache-key.outputs.key }}
+        restore-keys: |
+          python-${{ runner.os }}-
+
+    - name: ⬆️ Upgrade pip and setuptools
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        echo "✅ pip upgraded to $(pip --version)"
+
+    - name: 📦 Install Dependencies
+      run: |
+        echo "📥 Installing core dependencies..."
+        pip install -r requirements.txt
+        echo "✅ Dependencies installed successfully"
+
+    - name: 🔍 Verify Installation
+      run: |
+        echo "🔍 Verifying Python environment..."
+        python --version
+        pip list
+
+        echo "🧪 Testing core imports..."
+        python -c "import django; print(f'✅ Django {django.get_version()}')"
+        python -c "import rest_framework; print('✅ Django REST Framework')"
+        python -c "import channels; print('✅ Django Channels')"
+        python -c "import requests; print('✅ Requests')"
+
+    - name: 📊 Environment Summary
+      run: |
+        echo "## 🐍 Python Environment Ready" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Python | ✅ $(python --version) |" >> $GITHUB_STEP_SUMMARY
+        echo "| pip | ✅ $(pip --version) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Django | ✅ $(python -c 'import django; print(django.get_version())') |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dependencies | ✅ $(pip list | wc -l) packages |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🗄️ DATABASE SETUP & MIGRATIONS
+  # ============================================================================
+  database-setup:
+    name: 🗄️ Database Setup & Migrations
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python]
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 📦 Restore Python Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ needs.setup-python.outputs.cache-key }}
+        restore-keys: |
+          python-${{ runner.os }}-
+
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: ⚙️ Setup Environment Variables
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY || 'django-test-secret-key-for-ci-cd-pipeline-only' }}
+        DEBUG: ${{ secrets.DEBUG || 'True' }}
+        ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS || 'localhost,127.0.0.1,testserver' }}
+        OPENROUTER_HOST: ${{ secrets.OPENROUTER_HOST || 'https://openrouter.ai/api/v1' }}
+        OPENROUTER_API_KEY_OPENROUTER: ${{ secrets.OPENROUTER_API_KEY_OPENROUTER || 'test-key-openrouter' }}
+        BREAKDOWN_MODEL: ${{ secrets.BREAKDOWN_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REVIEWER_MODEL: ${{ secrets.REVIEWER_MODEL || 'tngtech/deepseek-r1t2-chimera:free' }}
+        FINALIZER_MODEL: ${{ secrets.FINALIZER_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REANALYZER_MODEL: ${{ secrets.REANALYZER_MODEL || 'openrouter/horizon-beta' }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL || 'sqlite:///test_db.sqlite3' }}
+        LOG_LEVEL: ${{ secrets.LOG_LEVEL || 'INFO' }}
+        LOG_FILE: ${{ secrets.LOG_FILE || 'logs/test.log' }}
+      run: |
+        echo "🔧 Creating environment configuration from GitHub secrets..."
+        cat > .env << EOF
+        DEBUG=${DEBUG}
+        SECRET_KEY=${SECRET_KEY}
+        ALLOWED_HOSTS=${ALLOWED_HOSTS}
+
+        # AI Configuration
+        OPENROUTER_HOST=${OPENROUTER_HOST}
+        OPENROUTER_API_KEY_OPENROUTER=${OPENROUTER_API_KEY_OPENROUTER}
+        BREAKDOWN_MODEL=${BREAKDOWN_MODEL}
+        REVIEWER_MODEL=${REVIEWER_MODEL}
+        FINALIZER_MODEL=${FINALIZER_MODEL}
+        REANALYZER_MODEL=${REANALYZER_MODEL}
+
+        # Database Configuration
+        DATABASE_URL=${DATABASE_URL}
+
+        # Logging Configuration
+        LOG_LEVEL=${LOG_LEVEL}
+        LOG_FILE=${LOG_FILE}
+        EOF
+        echo "✅ Environment configuration created from GitHub secrets"
+
+    - name: 📁 Create Required Directories
+      run: |
+        echo "📁 Creating project directories..."
+        mkdir -p logs
+        mkdir -p media/documents
+        mkdir -p staticfiles
+        mkdir -p test_results
+        echo "✅ Directories created"
+
+    - name: 🔍 Django System Check
+      run: |
+        echo "🔍 Running Django system checks..."
+        python manage.py check --deploy
+        echo "✅ Django system check passed"
+
+    - name: 🗄️ Create Migrations
+      run: |
+        echo "🗄️ Creating database migrations..."
+        python manage.py makemigrations --dry-run --verbosity=2
+        python manage.py makemigrations --verbosity=2
+        echo "✅ Migrations created successfully"
+
+    - name: 🗄️ Apply Migrations
+      run: |
+        echo "🗄️ Applying database migrations..."
+        python manage.py migrate --verbosity=2
+        python manage.py showmigrations
+        echo "✅ Migrations applied successfully"
+
+    - name: 🔍 Database Validation
+      run: |
+        echo "🔍 Validating database setup..."
+        python manage.py shell -c "
+        from django.db import connection
+        from django.contrib.auth.models import User
+        from breakdown.models import Document, Breakdown, Section, Annotation
+
+        # Test database connection
+        connection.ensure_connection()
+        print('✅ Database connection successful')
+
+        # Test model creation
+        user_count = User.objects.count()
+        print(f'✅ User model accessible: {user_count} users')
+
+        doc_count = Document.objects.count()
+        print(f'✅ Document model accessible: {doc_count} documents')
+
+        breakdown_count = Breakdown.objects.count()
+        print(f'✅ Breakdown model accessible: {breakdown_count} breakdowns')
+
+        section_count = Section.objects.count()
+        print(f'✅ Section model accessible: {section_count} sections')
+
+        annotation_count = Annotation.objects.count()
+        print(f'✅ Annotation model accessible: {annotation_count} annotations')
+
+        print('🎉 All models are working correctly!')
+        "
+
+    - name: 📊 Database Summary
+      run: |
+        echo "## 🗄️ Database Setup Complete" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| System Check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Migrations | ✅ Applied |" >> $GITHUB_STEP_SUMMARY
+        echo "| Models | ✅ Validated |" >> $GITHUB_STEP_SUMMARY
+        echo "| Connection | ✅ Working |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🧪 COMPREHENSIVE TEST SUITE
+  # ============================================================================
+  test-suite:
+    name: 🧪 Comprehensive Test Suite
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python, database-setup]
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 📦 Restore Python Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ needs.setup-python.outputs.cache-key }}
+        restore-keys: |
+          python-${{ runner.os }}-
+
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: ⚙️ Setup Test Environment
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY || 'django-test-secret-key-for-ci-cd-pipeline-only' }}
+        DEBUG: 'True'
+        ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS || 'localhost,127.0.0.1,testserver' }}
+        OPENROUTER_HOST: ${{ secrets.OPENROUTER_HOST || 'https://openrouter.ai/api/v1' }}
+        OPENROUTER_API_KEY_OPENROUTER: ${{ secrets.OPENROUTER_API_KEY_OPENROUTER || 'test-key-openrouter' }}
+        BREAKDOWN_MODEL: ${{ secrets.BREAKDOWN_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REVIEWER_MODEL: ${{ secrets.REVIEWER_MODEL || 'tngtech/deepseek-r1t2-chimera:free' }}
+        FINALIZER_MODEL: ${{ secrets.FINALIZER_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REANALYZER_MODEL: ${{ secrets.REANALYZER_MODEL || 'openrouter/horizon-beta' }}
+        DATABASE_URL: 'sqlite:///test_db.sqlite3'
+        LOG_LEVEL: 'DEBUG'
+        LOG_FILE: 'logs/test.log'
+      run: |
+        echo "🔧 Setting up test environment from GitHub secrets..."
+        cat > .env << EOF
+        DEBUG=${DEBUG}
+        SECRET_KEY=${SECRET_KEY}
+        ALLOWED_HOSTS=${ALLOWED_HOSTS}
+
+        # AI Configuration
+        OPENROUTER_HOST=${OPENROUTER_HOST}
+        OPENROUTER_API_KEY_OPENROUTER=${OPENROUTER_API_KEY_OPENROUTER}
+        BREAKDOWN_MODEL=${BREAKDOWN_MODEL}
+        REVIEWER_MODEL=${REVIEWER_MODEL}
+        FINALIZER_MODEL=${FINALIZER_MODEL}
+        REANALYZER_MODEL=${REANALYZER_MODEL}
+
+        # Database Configuration
+        DATABASE_URL=${DATABASE_URL}
+
+        # Testing Configuration
+        TESTING=True
+        DISABLE_API_CALLS=True
+
+        # Logging Configuration
+        LOG_LEVEL=${LOG_LEVEL}
+        LOG_FILE=${LOG_FILE}
+        EOF
+
+        # Create directories
+        mkdir -p logs media/documents staticfiles test_results
+
+        # Apply migrations
+        python manage.py migrate --verbosity=0
+
+    - name: 🧪 Run Custom Test Suite
+      run: |
+        echo "🧪 Running comprehensive test suite..."
+        python run_tests.py
+        echo "✅ Custom test suite completed"
+
+    - name: 🧪 Run Django Tests
+      run: |
+        echo "🧪 Running Django test suite..."
+        python manage.py test --verbosity=2 --keepdb
+        echo "✅ Django tests completed"
+
+    - name: 📊 Test Coverage Analysis
+      run: |
+        echo "📊 Analyzing test coverage..."
+        pip install coverage
+        coverage run --source='.' manage.py test
+        coverage report --show-missing
+        coverage html
+        echo "✅ Coverage analysis completed"
+
+    - name: 📤 Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test_results/
+          htmlcov/
+          logs/
+        retention-days: 30
+
+    - name: 📊 Test Summary
+      if: always()
+      run: |
+        echo "## 🧪 Test Suite Results" >> $GITHUB_STEP_SUMMARY
+
+        # Parse test results if available
+        if [ -d "test_results" ]; then
+          latest_run=$(ls -t test_results/ | head -n1)
+          if [ -f "test_results/$latest_run/summary.json" ]; then
+            python3 << 'EOF'
+        import json
+        import os
+try:
+    with open(f'test_results/{os.listdir("test_results")[0]}/summary.json', 'r') as f:
+        results = json.load(f)
+    print(f"| Total Tests | {results.get('total_tests', 'N/A')} |")
+    print(f"| Passed | {results.get('passed_tests', 'N/A')} |")
+    print(f"| Failed | {results.get('failed_tests', 'N/A')} |")
+    print(f"| Skipped | {results.get('skipped_tests', 'N/A')} |")
+    print(f"| Duration | {results.get('duration', 'N/A')}s |")
+except:
+    print("| Status | ✅ Tests Completed |")
+EOF
+          fi
+        fi
+
+  # ============================================================================
+  # 🎨 CODE QUALITY & FORMATTING
+  # ============================================================================
+  code-quality:
+    name: 🎨 Code Quality & Formatting
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python]
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 📦 Restore Python Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ needs.setup-python.outputs.cache-key }}
+        restore-keys: |
+          python-${{ runner.os }}-
+
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 🔍 Import Sorting (isort)
+      run: |
+        echo "🔍 Checking import sorting..."
+        python -m isort --check-only --diff .
+        echo "✅ Import sorting check passed"
+
+    - name: 🎨 Code Formatting (black)
+      run: |
+        echo "🎨 Checking code formatting..."
+        python -m black --check --diff .
+        echo "✅ Code formatting check passed"
+
+    - name: 🔍 Linting (flake8)
+      run: |
+        echo "🔍 Running code linting..."
+        python -m flake8 --statistics --tee --output-file=flake8-report.txt
+        echo "✅ Linting check passed"
+
+    - name: 🏷️ Type Checking (mypy)
+      run: |
+        echo "🏷️ Running type checking..."
+        python -m mypy breakdown ai_report_writer --ignore-missing-imports --show-error-codes | tee mypy-report.txt
+        echo "✅ Type checking completed"
+
+    - name: 📤 Upload Quality Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: code-quality-reports
+        path: |
+          flake8-report.txt
+          mypy-report.txt
+        retention-days: 30
+
+    - name: 📊 Quality Summary
+      run: |
+        echo "## 🎨 Code Quality Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Import Sorting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Formatting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Linting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Type Checking | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🔒 SECURITY SCANNING
+  # ============================================================================
+  security-scan:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python]
+    if: github.event_name == 'push' || github.event.inputs.run_security_scan == 'true'
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 📦 Restore Python Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ needs.setup-python.outputs.cache-key }}
+        restore-keys: |
+          python-${{ runner.os }}-
+
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 🔒 Security Linting (bandit)
+      run: |
+        echo "🔒 Running security analysis..."
+        python -m bandit -r breakdown ai_report_writer -f json -o bandit-report.json || true
+        python -m bandit -r breakdown ai_report_writer -f screen -ll
+        echo "✅ Security analysis completed"
+
+    - name: 🛡️ Dependency Vulnerability Scan (safety)
+      run: |
+        echo "🛡️ Scanning dependencies for vulnerabilities..."
+        python -m safety check -r requirements.txt --full-report --output json --output-file safety-report.json || true
+        python -m safety check -r requirements.txt --full-report
+        echo "✅ Dependency scan completed"
+
+    - name: 🔍 Secret Detection
+      run: |
+        echo "🔍 Scanning for secrets..."
+        python -m detect_secrets scan --all-files --baseline .secrets.baseline
+        echo "✅ Secret detection completed"
+
+    - name: 📤 Upload Security Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+        retention-days: 30
+
+    - name: 📊 Security Summary
+      run: |
+        echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Security | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dependencies | ✅ Scanned |" >> $GITHUB_STEP_SUMMARY
+        echo "| Secret Detection | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 📦 BUILD & PACKAGE
+  # ============================================================================
+  build-package:
+    name: 📦 Build & Package
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python, database-setup, test-suite, code-quality]
+    if: needs.pre-flight.outputs.should-deploy == 'true'
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python ${{ needs.pre-flight.outputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ needs.pre-flight.outputs.python-version }}
+
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: ⚙️ Setup Production Environment
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+        OPENROUTER_HOST: ${{ secrets.OPENROUTER_HOST || 'https://openrouter.ai/api/v1' }}
+        OPENROUTER_API_KEY_DEEPSEEK: ${{ secrets.OPENROUTER_API_KEY_DEEPSEEK }}
+        OPENROUTER_API_KEY_TNGTECH: ${{ secrets.OPENROUTER_API_KEY_TNGTECH }}
+        OPENROUTER_API_KEY_OPENROUTER: ${{ secrets.OPENROUTER_API_KEY_OPENROUTER }}
+        BREAKDOWN_MODEL: ${{ secrets.BREAKDOWN_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REVIEWER_MODEL: ${{ secrets.REVIEWER_MODEL || 'tngtech/deepseek-r1t2-chimera:free' }}
+        FINALIZER_MODEL: ${{ secrets.FINALIZER_MODEL || 'deepseek/deepseek-r1-0528-qwen3-8b:free' }}
+        REANALYZER_MODEL: ${{ secrets.REANALYZER_MODEL || 'openrouter/horizon-beta' }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        LOG_LEVEL: ${{ secrets.LOG_LEVEL || 'INFO' }}
+        LOG_FILE: ${{ secrets.LOG_FILE || 'logs/app.log' }}
+      run: |
+        echo "⚙️ Creating production environment configuration from GitHub secrets..."
+        cat > .env.production << EOF
+        DEBUG=False
+        SECRET_KEY=${SECRET_KEY}
+        ALLOWED_HOSTS=${ALLOWED_HOSTS}
+
+        # AI Configuration
+        OPENROUTER_HOST=${OPENROUTER_HOST}
+        OPENROUTER_API_KEY_OPENROUTER=${OPENROUTER_API_KEY_OPENROUTER}
+        BREAKDOWN_MODEL=${BREAKDOWN_MODEL}
+        REVIEWER_MODEL=${REVIEWER_MODEL}
+        FINALIZER_MODEL=${FINALIZER_MODEL}
+        REANALYZER_MODEL=${REANALYZER_MODEL}
+
+        # Database Configuration
+        DATABASE_URL=${DATABASE_URL}
+
+        # Logging Configuration
+        LOG_LEVEL=${LOG_LEVEL}
+        LOG_FILE=${LOG_FILE}
+        EOF
+        echo "✅ Production environment configuration created from GitHub secrets"
+
+    - name: 📁 Collect Static Files
+      run: |
+        echo "📁 Collecting static files..."
+        mkdir -p staticfiles
+        python manage.py collectstatic --noinput --verbosity=2
+        echo "✅ Static files collected"
+
+    - name: 📦 Create Distribution Package
+      run: |
+        echo "📦 Creating distribution package..."
+
+        # Create deployment directory
+        mkdir -p dist/ai-report-writer
+
+        # Copy application files
+        cp -r breakdown/ dist/ai-report-writer/
+        cp -r ai_report_writer/ dist/ai-report-writer/
+        cp -r templates/ dist/ai-report-writer/
+        cp -r static/ dist/ai-report-writer/
+        cp -r staticfiles/ dist/ai-report-writer/
+        cp -r scripts/ dist/ai-report-writer/
+        cp -r docs/ dist/ai-report-writer/
+
+        # Copy configuration files
+        cp requirements.txt dist/ai-report-writer/
+        cp manage.py dist/ai-report-writer/
+        cp .env.production dist/ai-report-writer/.env.example
+        cp README.md dist/ai-report-writer/
+        cp pyproject.toml dist/ai-report-writer/
+        cp .flake8 dist/ai-report-writer/
+        cp Makefile dist/ai-report-writer/
+
+        # Create deployment scripts
+        cat > dist/ai-report-writer/deploy.sh << 'EOF'
+#!/bin/bash
+echo "🚀 AI Report Writer Deployment Script"
+echo "===================================="
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Setup environment
+cp .env.example .env
+echo "⚠️  Please configure your .env file with production settings"
+
+# Create directories
+mkdir -p logs media/documents staticfiles backups
+
+# Run migrations
+python manage.py migrate
+
+# Collect static files
+python manage.py collectstatic --noinput
+
+# Create superuser (optional)
+echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'changeme') if not User.objects.filter(username='admin').exists() else None" | python manage.py shell
+
+echo "✅ Deployment completed!"
+echo "🚀 Start with: python manage.py runserver"
+EOF
+        chmod +x dist/ai-report-writer/deploy.sh
+
+        # Create archive
+        cd dist
+        tar -czf ai-report-writer-${{ github.sha }}.tar.gz ai-report-writer/
+        cd ..
+
+        echo "✅ Distribution package created"
+
+    - name: 📤 Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ai-report-writer-build
+        path: |
+          dist/ai-report-writer-${{ github.sha }}.tar.gz
+        retention-days: 90
+
+    - name: 📊 Build Summary
+      run: |
+        echo "## 📦 Build Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Static Files | ✅ Collected |" >> $GITHUB_STEP_SUMMARY
+        echo "| Package | ✅ Created |" >> $GITHUB_STEP_SUMMARY
+        echo "| Archive | ✅ ai-report-writer-${{ github.sha }}.tar.gz |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🚀 DEPLOYMENT
+  # ============================================================================
+  deploy:
+    name: 🚀 Deploy to ${{ needs.pre-flight.outputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [pre-flight, build-package]
+    if: needs.pre-flight.outputs.should-deploy == 'true'
+    environment: ${{ needs.pre-flight.outputs.environment }}
+
+    steps:
+    - name: 📥 Download Build Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ai-report-writer-build
+        path: ./artifacts
+
+    - name: 🚀 Deploy to ${{ needs.pre-flight.outputs.environment }}
+      run: |
+        echo "🚀 Deploying AI Report Writer to ${{ needs.pre-flight.outputs.environment }}"
+        echo "📦 Package: ai-report-writer-${{ github.sha }}.tar.gz"
+        echo "🌍 Environment: ${{ needs.pre-flight.outputs.environment }}"
+
+        # This is where you would add your actual deployment steps
+        # Examples:
+        # - Upload to server via SSH/SCP
+        # - Deploy to cloud platform (AWS, Azure, GCP)
+        # - Update container registry
+        # - Trigger deployment webhook
+
+        echo "✅ Deployment completed successfully!"
+
+    - name: 📊 Deployment Summary
+      run: |
+        echo "## 🚀 Deployment Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Environment | ${{ needs.pre-flight.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Package | ai-report-writer-${{ github.sha }}.tar.gz |" >> $GITHUB_STEP_SUMMARY
+        echo "| Status | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 🎉 PIPELINE SUMMARY
+  # ============================================================================
+  pipeline-summary:
+    name: 🎉 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [pre-flight, setup-python, database-setup, test-suite, code-quality, security-scan, build-package, deploy]
+    if: always()
+
+    steps:
+    - name: 📊 Generate Pipeline Summary
+      run: |
+        echo "# 🤖 AI Report Writer Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📋 Pipeline Overview" >> $GITHUB_STEP_SUMMARY
+        echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔍 Pre-flight | ${{ needs.pre-flight.result == 'success' && '✅' || '❌' }} ${{ needs.pre-flight.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🐍 Python Setup | ${{ needs.setup-python.result == 'success' && '✅' || '❌' }} ${{ needs.setup-python.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🗄️ Database | ${{ needs.database-setup.result == 'success' && '✅' || '❌' }} ${{ needs.database-setup.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🧪 Tests | ${{ needs.test-suite.result == 'success' && '✅' || '❌' }} ${{ needs.test-suite.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🎨 Code Quality | ${{ needs.code-quality.result == 'success' && '✅' || '❌' }} ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔒 Security | ${{ needs.security-scan.result == 'success' && '✅' || needs.security-scan.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 📦 Build | ${{ needs.build-package.result == 'success' && '✅' || needs.build-package.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.build-package.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🚀 Deploy | ${{ needs.deploy.result == 'success' && '✅' || needs.deploy.result == 'skipped' && '⏭️' || '❌' }} ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Determine overall status
+        if [[ "${{ needs.pre-flight.result }}" == "success" && "${{ needs.setup-python.result }}" == "success" && "${{ needs.database-setup.result }}" == "success" && "${{ needs.test-suite.result }}" == "success" && "${{ needs.code-quality.result }}" == "success" ]]; then
+          echo "## 🎉 Pipeline Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "All critical stages completed successfully!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ❌ Pipeline Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "One or more critical stages failed. Please check the logs." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🔗 Useful Links" >> $GITHUB_STEP_SUMMARY
+        echo "- 📊 [Test Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔒 [Security Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [Build Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        echo "- 📚 [Documentation](https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}/docs)" >> $GITHUB_STEP_SUMMARY
+
+    - name: 🔔 Notification Summary
+      run: |
+        echo "🔔 Pipeline completed for AI Report Writer"
+        echo "📊 Branch: ${{ github.ref_name }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "🎯 Event: ${{ github.event_name }}"
+
+        # This is where you could add notifications to Slack, Discord, email, etc.

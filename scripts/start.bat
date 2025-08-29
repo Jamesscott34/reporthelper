@@ -4,6 +4,9 @@ setlocal enabledelayedexpansion
 REM AI Report Writer - Complete Startup & Setup Script for Windows
 REM Handles everything automatically with constant updates and comprehensive setup
 
+REM Change to project root directory
+cd /d "%~dp0\.."
+
 echo 🚀 AI Report Writer - Complete Startup & Setup System
 echo ====================================================
 
@@ -81,17 +84,17 @@ REM Check if key packages are installed
 python -c "import django" >nul 2>&1
 if errorlevel 1 (
     call :print_status "Installing Python dependencies..."
-    
+
     REM Upgrade pip
     python -m pip install --upgrade pip
-    
+
     REM Install core dependencies first
     pip install django python-docx PyPDF2 requests python-dotenv
     if errorlevel 1 (
         call :print_error "Failed to install core dependencies"
         exit /b 1
     )
-    
+
     REM Install requirements if file exists
     if exist "requirements.txt" (
         pip install -r requirements.txt
@@ -99,7 +102,7 @@ if errorlevel 1 (
             call :print_warning "Some requirements failed to install"
         )
     )
-    
+
     call :print_success "Python dependencies installed"
 ) else (
     call :print_success "Python dependencies already installed"
@@ -486,4 +489,4 @@ REM Default: run main function
 call :main
 
 :end
-pause 
+pause

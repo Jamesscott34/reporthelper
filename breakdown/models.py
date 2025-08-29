@@ -5,23 +5,28 @@ This app handles document uploads and AI-powered breakdown of documents
 into step-by-step instructions.
 """
 
-from django.db import models
-from django.contrib.auth.models import User
 import json
+
+from django.contrib.auth.models import User
+from django.db import models
 
 
 class Document(models.Model):
     """
     Model to store uploaded documents and their metadata.
     """
+
     title = models.CharField(max_length=255)
-    file = models.FileField(upload_to='documents/')
-    file_type = models.CharField(max_length=10, choices=[
-        ('pdf', 'PDF'),
-        ('docx', 'DOCX'),
-        ('doc', 'DOC'),
-        ('txt', 'TXT'),
-    ])
+    file = models.FileField(upload_to="documents/")
+    file_type = models.CharField(
+        max_length=10,
+        choices=[
+            ("pdf", "PDF"),
+            ("docx", "DOCX"),
+            ("doc", "DOC"),
+            ("txt", "TXT"),
+        ],
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     uploaded_by = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, blank=True
@@ -29,28 +34,36 @@ class Document(models.Model):
     extracted_text = models.TextField(blank=True)
     # Structured pointers back to original content (pages/paragraphs/offsets)
     extraction_map = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=20, choices=[
-        ('uploaded', 'Uploaded'),
-        ('processing', 'Processing'),
-        ('ready_for_ai', 'Ready For AI'),  # aligns with view usage
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-    ], default='uploaded')
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("uploaded", "Uploaded"),
+            ("processing", "Processing"),
+            ("ready_for_ai", "Ready For AI"),  # aligns with view usage
+            ("completed", "Completed"),
+            ("failed", "Failed"),
+        ],
+        default="uploaded",
+    )
     # New fields for tracking relationships
     parent_document = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='generated_files',
+        related_name="generated_files",
     )
-    document_type = models.CharField(max_length=20, choices=[
-        ('original', 'Original Upload'),
-        ('breakdown', 'AI Breakdown'),
-        ('report', 'Generated Report'),
-        ('comparison', 'Comparison Analysis'),
-        ('export', 'Exported File'),
-    ], default='original')
+    document_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("original", "Original Upload"),
+            ("breakdown", "AI Breakdown"),
+            ("report", "Generated Report"),
+            ("comparison", "Comparison Analysis"),
+            ("export", "Exported File"),
+        ],
+        default="original",
+    )
     # Additional metadata for generated files
     # e.g., 'AI Breakdown', 'Comparison Analysis'
     generation_method = models.CharField(max_length=50, blank=True)
@@ -58,22 +71,17 @@ class Document(models.Model):
     ai_model_used = models.CharField(max_length=100, blank=True)
 
     def __str__(self):
-        if self.document_type == 'original':
+        if self.document_type == "original":
             return f"{self.title} ({self.file_type}) - Original"
-        return (
-            f"{self.title} ({self.file_type}) - "
-            f"{self.document_type.title()}"
-        )
+        return f"{self.title} ({self.file_type}) - " f"{self.document_type.title()}"
 
     def is_original(self):
         """Check if this is an original uploaded document."""
-        return (
-            self.document_type == 'original' and self.parent_document is None
-        )
+        return self.document_type == "original" and self.parent_document is None
 
     def is_generated(self):
         """Check if this is a generated file."""
-        return self.document_type != 'original'
+        return self.document_type != "original"
 
     def get_original_document(self):
         """Get the original document that this file was generated from."""
@@ -88,32 +96,37 @@ class Document(models.Model):
         return self.generated_files.all()
 
     class Meta:
-        ordering = ['-uploaded_at']
+        ordering = ["-uploaded_at"]
 
 
 class Breakdown(models.Model):
     """
     Model to store AI-generated breakdowns of documents.
     """
+
     document = models.ForeignKey(
         Document,
         on_delete=models.CASCADE,
-        related_name='breakdowns',
+        related_name="breakdowns",
     )
     content = models.JSONField(default=dict)
     raw_breakdown = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    status = models.CharField(max_length=20, choices=[
-        ('draft', 'Draft'),
-        ('ready', 'Ready'),              # aligns with view usage
-        ('processing', 'Processing'),    # aligns with view usage
-        ('completed', 'Completed'),      # aligns with view usage
-        ('failed', 'Failed'),            # aligns with view usage
-        ('reviewed', 'Reviewed'),
-        ('finalized', 'Finalized'),
-    ], default='draft')
-    ai_model_used = models.CharField(max_length=100, default='deepseek-r1')
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("draft", "Draft"),
+            ("ready", "Ready"),  # aligns with view usage
+            ("processing", "Processing"),  # aligns with view usage
+            ("completed", "Completed"),  # aligns with view usage
+            ("failed", "Failed"),  # aligns with view usage
+            ("reviewed", "Reviewed"),
+            ("finalized", "Finalized"),
+        ],
+        default="draft",
+    )
+    ai_model_used = models.CharField(max_length=100, default="deepseek-r1")
     # Persisted step-by-step content generated by AI workflows
     step_by_step_content = models.JSONField(default=dict, blank=True)
     # Document-level summary (short)
@@ -128,11 +141,11 @@ class Breakdown(models.Model):
             try:
                 return json.loads(self.content)
             except json.JSONDecodeError:
-                return {'sections': [self.content]}
+                return {"sections": [self.content]}
         return self.content
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
 
 class Section(models.Model):
@@ -146,7 +159,7 @@ class Section(models.Model):
     breakdown = models.ForeignKey(
         Breakdown,
         on_delete=models.CASCADE,
-        related_name='sections',
+        related_name="sections",
     )
     order = models.IntegerField(default=1)
     title = models.CharField(max_length=255)
@@ -160,7 +173,7 @@ class Section(models.Model):
         return f"Section {self.order}: {self.title}"
 
     class Meta:
-        ordering = ['order', 'id']
+        ordering = ["order", "id"]
 
 
 class QAEntry(models.Model):
@@ -168,24 +181,25 @@ class QAEntry(models.Model):
     Stores per-section or document-level Q&A with citation pointers back to
     the original using extraction_map semantics.
     """
+
     SCOPE_CHOICES = [
-        ('section', 'Section'),
-        ('neighbors', 'Section+Neighbors'),
-        ('document', 'Whole Document'),
+        ("section", "Section"),
+        ("neighbors", "Section+Neighbors"),
+        ("document", "Whole Document"),
     ]
     breakdown = models.ForeignKey(
         Breakdown,
         on_delete=models.CASCADE,
-        related_name='qa_entries',
+        related_name="qa_entries",
     )
     section = models.ForeignKey(
         Section,
         on_delete=models.CASCADE,
-        related_name='qa_entries',
+        related_name="qa_entries",
         null=True,
         blank=True,
     )
-    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default='section')
+    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default="section")
     question = models.TextField()
     answer = models.TextField(blank=True)
     citations = models.JSONField(default=list, blank=True)
@@ -193,7 +207,7 @@ class QAEntry(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        target = self.section.title if self.section else 'Document'
+        target = self.section.title if self.section else "Document"
         return f"Q&A for {target}: {self.question[:40]}..."
 
 
@@ -201,27 +215,30 @@ class Revision(models.Model):
     """
     Tracks edits to Sections and HowTos with before/after and status.
     """
+
     TARGET_CHOICES = [
-        ('section', 'Section'),
-        ('howto', 'HowTo'),
+        ("section", "Section"),
+        ("howto", "HowTo"),
     ]
     STATUS_CHOICES = [
-        ('proposed', 'Proposed'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Rejected'),
+        ("proposed", "Proposed"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
     ]
-    breakdown = models.ForeignKey(Breakdown, on_delete=models.CASCADE, related_name='revisions')
+    breakdown = models.ForeignKey(
+        Breakdown, on_delete=models.CASCADE, related_name="revisions"
+    )
     target_type = models.CharField(max_length=16, choices=TARGET_CHOICES)
     target_id = models.IntegerField()
     before = models.JSONField(default=dict)
     after = models.JSONField(default=dict)
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='proposed')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="proposed")
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
 
 class HowTo(models.Model):
@@ -229,28 +246,234 @@ class HowTo(models.Model):
     Structured how-to guide associated with a whole breakdown or a specific
     section. Stores ordered steps as JSON.
     """
+
     SCOPE_CHOICES = [
-        ('document', 'Document'),
-        ('section', 'Section'),
+        ("document", "Document"),
+        ("section", "Section"),
     ]
     breakdown = models.ForeignKey(
         Breakdown,
         on_delete=models.CASCADE,
-        related_name='howtos',
+        related_name="howtos",
     )
     section = models.ForeignKey(
         Section,
         on_delete=models.CASCADE,
-        related_name='howtos',
+        related_name="howtos",
         null=True,
         blank=True,
     )
-    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default='document')
+    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default="document")
     title = models.CharField(max_length=255, blank=True)
     steps = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        target = self.section.title if self.section else 'Document'
+        target = self.section.title if self.section else "Document"
         return f"How-To for {target}"
+
+
+class Annotation(models.Model):
+    """
+    Lightweight, offset-based annotations tied to a Document.
+
+    Annotations provide a way to mark up documents with highlights, comments,
+    sticky notes, and redactions. Each annotation is positioned using character
+    offsets into the extracted text and can be resolved back to original
+    document locations using the extraction_map.
+
+    Args:
+        document: Foreign key to Document the annotation belongs to.
+        annotation_type: One of 'highlight', 'comment', 'sticky_note', 'redaction'.
+        start_offset: Integer character offset where annotation begins (inclusive).
+        end_offset: Integer character offset where annotation ends (exclusive).
+        content: Optional text payload for comments or sticky notes.
+        color: Hex color for UI display (default yellow #ffff00).
+        user: Author of the annotation.
+        created_at: Timestamp when annotation was created.
+
+    Notes:
+        - Offsets use [start, end) convention (start inclusive, end exclusive)
+        - Use the existing extraction_map to resolve selections to (page,line,para,char)
+        - Redactions will be handled specially during export based on export settings
+        - Annotations are isolated per user and document for security
+
+    Example:
+        # Create a highlight annotation
+        annotation = Annotation.objects.create(
+            document=doc,
+            annotation_type='highlight',
+            start_offset=100,
+            end_offset=150,
+            color='#ffff00',
+            user=request.user
+        )
+    """
+
+    ANNOTATION_TYPE_CHOICES = [
+        ("highlight", "Highlight"),
+        ("comment", "Comment"),
+        ("sticky_note", "Sticky Note"),
+        ("redaction", "Redaction"),
+    ]
+
+    document = models.ForeignKey(
+        Document, on_delete=models.CASCADE, related_name="annotations"
+    )
+    annotation_type = models.CharField(max_length=20, choices=ANNOTATION_TYPE_CHOICES)
+    start_offset = models.IntegerField(
+        help_text="Character offset where annotation starts (inclusive)"
+    )
+    end_offset = models.IntegerField(
+        help_text="Character offset where annotation ends (exclusive)"
+    )
+    content = models.TextField(
+        blank=True, help_text="Text content for comments and sticky notes"
+    )
+    color = models.CharField(
+        max_length=7, default="#ffff00", help_text="Hex color code for UI display"
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, help_text="User who created this annotation"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start_offset", "created_at"]
+        indexes = [
+            models.Index(fields=["document", "start_offset", "end_offset"]),
+            models.Index(fields=["document", "user"]),
+            models.Index(fields=["annotation_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_annotation_type_display()} by {self.user.username} on {self.document.title}"
+
+    def clean(self):
+        """Validate annotation offsets and content."""
+        from django.core.exceptions import ValidationError
+
+        if self.start_offset < 0:
+            raise ValidationError("Start offset cannot be negative")
+
+        if self.end_offset <= self.start_offset:
+            raise ValidationError("End offset must be greater than start offset")
+
+        # Validate against document text length if available
+        if self.document and self.document.extracted_text:
+            text_length = len(self.document.extracted_text)
+            if self.end_offset > text_length:
+                raise ValidationError(
+                    f"End offset ({self.end_offset}) exceeds document length ({text_length})"
+                )
+
+        # Validate content requirements
+        if (
+            self.annotation_type in ["comment", "sticky_note"]
+            and not self.content.strip()
+        ):
+            raise ValidationError(
+                f"{self.get_annotation_type_display()} annotations require content"
+            )
+
+    def save(self, *args, **kwargs):
+        """Override save to run validation."""
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def get_text_content(self):
+        """Get the actual text content this annotation covers."""
+        if not self.document or not self.document.extracted_text:
+            return ""
+
+        text = self.document.extracted_text
+        return text[self.start_offset : self.end_offset]
+
+    def get_context(self, context_chars=50):
+        """Get surrounding context for this annotation."""
+        if not self.document or not self.document.extracted_text:
+            return ""
+
+        text = self.document.extracted_text
+        start = max(0, self.start_offset - context_chars)
+        end = min(len(text), self.end_offset + context_chars)
+
+        return {
+            "before": text[start : self.start_offset],
+            "content": text[self.start_offset : self.end_offset],
+            "after": text[self.end_offset : end],
+        }
+
+    def resolve_to_source(self):
+        """
+        Resolve annotation offsets back to original document structure.
+
+        Returns:
+            dict: Source location information based on extraction_map
+        """
+        if not self.document or not self.document.extraction_map:
+            return {}
+
+        extraction_map = self.document.extraction_map
+        map_type = extraction_map.get("type")
+
+        if map_type == "pdf":
+            return self._resolve_pdf_location(extraction_map)
+        elif map_type == "docx":
+            return self._resolve_docx_location(extraction_map)
+        elif map_type in ("txt", "doc"):
+            return self._resolve_text_location(extraction_map)
+
+        return {}
+
+    def _resolve_pdf_location(self, extraction_map):
+        """Resolve annotation to PDF page and line."""
+        for page_data in extraction_map.get("pages", []):
+            for line_data in page_data.get("lines", []):
+                if (
+                    line_data.get("char_start", 0)
+                    <= self.start_offset
+                    < line_data.get("char_end", 0)
+                ):
+                    return {
+                        "type": "pdf",
+                        "page": page_data.get("page"),
+                        "line": line_data.get("index"),
+                        "char_start": line_data.get("char_start"),
+                        "char_end": line_data.get("char_end"),
+                    }
+        return {}
+
+    def _resolve_docx_location(self, extraction_map):
+        """Resolve annotation to DOCX paragraph."""
+        for para_data in extraction_map.get("paragraphs", []):
+            if (
+                para_data.get("char_start", 0)
+                <= self.start_offset
+                < para_data.get("char_end", 0)
+            ):
+                return {
+                    "type": "docx",
+                    "paragraph": para_data.get("index"),
+                    "char_start": para_data.get("char_start"),
+                    "char_end": para_data.get("char_end"),
+                }
+        return {}
+
+    def _resolve_text_location(self, extraction_map):
+        """Resolve annotation to text line."""
+        for line_data in extraction_map.get("lines", []):
+            if (
+                line_data.get("char_start", 0)
+                <= self.start_offset
+                < line_data.get("char_end", 0)
+            ):
+                return {
+                    "type": extraction_map.get("type"),
+                    "line": line_data.get("line"),
+                    "char_start": line_data.get("char_start"),
+                    "char_end": line_data.get("char_end"),
+                }
+        return {}

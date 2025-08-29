@@ -2,27 +2,357 @@
 """
 Views for the breakdown app.
 
-This module handles document uploads and AI-powered breakdown processing.
+This module handles document uploads and AI-powered breakdown processing,
+including REST API endpoints for annotations and real-time collaboration.
 """
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.core.files.storage import default_storage
-from django.conf import settings
-from django.urls import reverse
 import json
 import os
 import threading
-from django.utils import timezone
-from django.core.files import File
 
-from .models import Document, Breakdown, Section, HowTo, QAEntry, Revision
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.core.files import File
+from django.core.files.storage import default_storage
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+# Django REST Framework imports
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from .ai_breakdown import AIBreakdownService
-from .utils import extract_text_from_file
-from .utils import extract_text_with_pointers, unpack_zip_to_temp
+from .models import Annotation, Breakdown, Document, HowTo, QAEntry, Revision, Section
+from .serializers import (
+    AnnotationListSerializer,
+    AnnotationSerializer,
+    BreakdownListSerializer,
+    BreakdownSerializer,
+    DocumentListSerializer,
+    DocumentSerializer,
+    HowToSerializer,
+    QAEntrySerializer,
+    RevisionSerializer,
+    SectionSerializer,
+)
+from .utils import (
+    extract_text_from_file,
+    extract_text_with_pointers,
+    unpack_zip_to_temp,
+)
+
+# Custom Permissions
+
+
+class IsDocumentMember(permissions.BasePermission):
+    """
+    Custom permission to ensure users can only access documents they own or have access to.
+
+    This permission class implements object-level permissions for documents and
+    related resources (annotations, breakdowns, etc.). It ensures data isolation
+    between users and prevents unauthorized access.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Check if user has permission to access the object.
+
+        Args:
+            request: The HTTP request object
+            view: The view being accessed
+            obj: The object being accessed
+
+        Returns:
+            bool: True if user has permission, False otherwise
+        """
+        # For Document objects, check if user is the uploader
+        if hasattr(obj, "uploaded_by"):
+            return obj.uploaded_by == request.user
+
+        # For objects related to Document (Annotation, Breakdown, etc.)
+        if hasattr(obj, "document"):
+            return obj.document.uploaded_by == request.user
+
+        # For objects related to Breakdown
+        if hasattr(obj, "breakdown"):
+            return obj.breakdown.document.uploaded_by == request.user
+
+        # For objects related to Section
+        if hasattr(obj, "section") and obj.section:
+            return obj.section.breakdown.document.uploaded_by == request.user
+
+        # Default deny
+        return False
+
+
+# REST API ViewSets
+
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Document model with file upload and processing capabilities.
+
+    Provides CRUD operations for documents with proper permissions and
+    additional actions for document processing and status checking.
+    """
+
+    serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated, IsDocumentMember]
+
+    def get_serializer_class(self):
+        """Use lightweight serializer for list actions."""
+        if self.action == "list":
+            return DocumentListSerializer
+        return DocumentSerializer
+
+    def get_queryset(self):
+        """Return documents owned by the current user."""
+        return Document.objects.filter(uploaded_by=self.request.user).order_by(
+            "-uploaded_at"
+        )
+
+    def perform_create(self, serializer):
+        """Set the uploaded_by field to the current user."""
+        serializer.save(uploaded_by=self.request.user)
+
+    @action(detail=True, methods=["get"])
+    def status(self, request, pk=None):
+        """Get processing status of a document."""
+        document = self.get_object()
+        return Response(
+            {
+                "status": document.status,
+                "has_extracted_text": bool(document.extracted_text),
+                "extraction_map_available": bool(document.extraction_map),
+                "file_size": document.file.size if document.file else 0,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def reprocess(self, request, pk=None):
+        """Reprocess document text extraction."""
+        document = self.get_object()
+
+        # Start background processing
+        thread = threading.Thread(
+            target=self._process_document_background, args=(document.id,)
+        )
+        thread.daemon = True
+        thread.start()
+
+        return Response({"message": "Document reprocessing started"})
+
+    def _process_document_background(self, document_id):
+        """Background processing for document text extraction."""
+        try:
+            document = Document.objects.get(id=document_id)
+            document.status = "processing"
+            document.save()
+
+            # Extract text and pointer map
+            extracted_text, extraction_map = extract_text_with_pointers(
+                document.file.path, document.file_type
+            )
+
+            if not extracted_text or len(extracted_text.strip()) < 10:
+                raise Exception("No text could be extracted from the document")
+
+            document.extracted_text = extracted_text
+            document.extraction_map = extraction_map
+            document.status = "ready_for_ai"
+            document.save()
+
+        except Exception as e:
+            try:
+                document = Document.objects.get(id=document_id)
+                document.status = "failed"
+                document.save()
+            except:
+                pass
+
+
+class AnnotationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Annotation model with real-time collaboration support.
+
+    Provides CRUD operations for annotations with proper validation,
+    permissions, and real-time updates via WebSocket broadcasting.
+    """
+
+    serializer_class = AnnotationSerializer
+    permission_classes = [IsAuthenticated, IsDocumentMember]
+
+    def get_serializer_class(self):
+        """Use lightweight serializer for list actions."""
+        if self.action == "list":
+            return AnnotationListSerializer
+        return AnnotationSerializer
+
+    def get_queryset(self):
+        """Return annotations for the specified document."""
+        document_pk = self.kwargs.get("document_pk")
+        if document_pk:
+            # Ensure user has access to the document
+            document = get_object_or_404(
+                Document.objects.filter(uploaded_by=self.request.user), pk=document_pk
+            )
+            return Annotation.objects.filter(document=document).select_related(
+                "user", "document"
+            )
+        return Annotation.objects.none()
+
+    def perform_create(self, serializer):
+        """
+        Create annotation with document validation and real-time broadcasting.
+
+        Validates that the user has access to the document and broadcasts
+        the new annotation to other users viewing the same document.
+        """
+        document_pk = self.kwargs.get("document_pk")
+        document = get_object_or_404(
+            Document.objects.filter(uploaded_by=self.request.user), pk=document_pk
+        )
+
+        annotation = serializer.save(document=document, user=self.request.user)
+
+        # Broadcast to WebSocket group (implement in channels consumer)
+        self._broadcast_annotation_event("created", annotation)
+
+    def perform_update(self, serializer):
+        """Update annotation with real-time broadcasting."""
+        annotation = serializer.save()
+        self._broadcast_annotation_event("updated", annotation)
+
+    def perform_destroy(self, instance):
+        """Delete annotation with real-time broadcasting."""
+        self._broadcast_annotation_event("deleted", instance)
+        super().perform_destroy(instance)
+
+    def _broadcast_annotation_event(self, action, annotation):
+        """
+        Broadcast annotation events to WebSocket group.
+
+        Sends real-time updates to all users viewing the same document
+        when annotations are created, updated, or deleted.
+
+        Args:
+            action: The action performed ('created', 'updated', 'deleted')
+            annotation: The annotation object
+        """
+        try:
+            from datetime import datetime
+
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+
+            channel_layer = get_channel_layer()
+            if channel_layer is None:
+                # Channel layer not configured, skip broadcasting
+                return
+
+            # Broadcast to document collaboration group
+            doc_group_name = f"doc_{annotation.document.id}"
+
+            # Prepare annotation data
+            if action == "deleted":
+                # For deleted annotations, we only have the ID
+                annotation_data = {
+                    "id": annotation.id if hasattr(annotation, "id") else None
+                }
+            else:
+                # For created/updated, serialize the full annotation
+                annotation_data = AnnotationSerializer(annotation).data
+
+            # Send to document collaboration group
+            async_to_sync(channel_layer.group_send)(
+                doc_group_name,
+                {
+                    "type": "annotation_event",
+                    "action": action,
+                    "annotation": annotation_data,
+                    "timestamp": datetime.now().isoformat(),
+                },
+            )
+
+            # Also send to annotation-specific group
+            annotation_group_name = f"doc_{annotation.document.id}_annotations"
+            async_to_sync(channel_layer.group_send)(
+                annotation_group_name,
+                {
+                    "type": f"annotation_{action}",
+                    "annotation": annotation_data if action != "deleted" else None,
+                    "annotation_id": (
+                        annotation.id if hasattr(annotation, "id") else None
+                    ),
+                    "timestamp": datetime.now().isoformat(),
+                },
+            )
+
+        except ImportError:
+            # Channels not installed, skip broadcasting
+            pass
+        except Exception as e:
+            # Log error but don't fail the request
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error broadcasting annotation event: {e}")
+
+    @action(detail=False, methods=["get"])
+    def by_type(self, request, document_pk=None):
+        """Get annotations filtered by type."""
+        annotation_type = request.query_params.get("type")
+        if not annotation_type:
+            return Response({"error": "Type parameter is required"}, status=400)
+
+        queryset = self.get_queryset().filter(annotation_type=annotation_type)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def in_range(self, request, document_pk=None):
+        """Get annotations within a character offset range."""
+        try:
+            start = int(request.query_params.get("start", 0))
+            end = int(request.query_params.get("end", 0))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid start/end parameters"}, status=400)
+
+        if start >= end:
+            return Response({"error": "Start must be less than end"}, status=400)
+
+        # Find annotations that overlap with the range
+        queryset = self.get_queryset().filter(
+            start_offset__lt=end, end_offset__gt=start
+        )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def context(self, request, pk=None, document_pk=None):
+        """Get extended context for an annotation."""
+        annotation = self.get_object()
+        context_chars = int(request.query_params.get("chars", 100))
+
+        context = annotation.get_context(context_chars)
+        source_location = annotation.resolve_to_source()
+
+        return Response(
+            {
+                "context": context,
+                "source_location": source_location,
+                "text_content": annotation.get_text_content(),
+            }
+        )
 
 
 def home(request):
@@ -30,16 +360,22 @@ def home(request):
     Home view - displays the main upload interface.
     """
     # Get original documents and their generated files
-    original_documents = Document.objects.filter(document_type='original').order_by('-uploaded_at')[:10]
-    generated_documents = Document.objects.filter(document_type__in=['breakdown', 'report', 'comparison', 'export']).order_by('-uploaded_at')[:5]
-    
+    original_documents = Document.objects.filter(document_type="original").order_by(
+        "-uploaded_at"
+    )[:10]
+    generated_documents = Document.objects.filter(
+        document_type__in=["breakdown", "report", "comparison", "export"]
+    ).order_by("-uploaded_at")[:5]
+
     # Combine and sort by upload date
     all_documents = list(original_documents) + list(generated_documents)
     all_documents.sort(key=lambda x: x.uploaded_at, reverse=True)
-    
-    return render(request, 'breakdown/home.html', {
-        'documents': all_documents[:15]  # Show up to 15 most recent documents
-    })
+
+    return render(
+        request,
+        "breakdown/home.html",
+        {"documents": all_documents[:15]},  # Show up to 15 most recent documents
+    )
 
 
 def process_document_background(document_id, breakdown_id):
@@ -49,43 +385,42 @@ def process_document_background(document_id, breakdown_id):
     try:
         document = Document.objects.get(id=document_id)
         breakdown = Breakdown.objects.get(id=breakdown_id)
-        
+
         # Update status to processing
-        document.status = 'processing'
+        document.status = "processing"
         document.save()
-        
+
         # Extract text and pointer map
         extracted_text, extraction_map = extract_text_with_pointers(
-            document.file.path,
-            document.file_type
+            document.file.path, document.file_type
         )
-        
+
         if not extracted_text or len(extracted_text.strip()) < 10:
             raise Exception("No text could be extracted from the document")
-        
+
         document.extracted_text = extracted_text
         document.extraction_map = extraction_map
-        document.status = 'completed'
+        document.status = "completed"
         document.save()
-        
+
         # Don't run AI automatically - let user choose when to run it
         # Just mark the document as ready for AI processing
-        document.status = 'ready_for_ai'
+        document.status = "ready_for_ai"
         document.save()
-        
+
         # Keep breakdown in 'ready' status until user requests AI processing
-        breakdown.status = 'ready'
+        breakdown.status = "ready"
         breakdown.save()
-        
+
     except Exception as e:
         # logging removed
         try:
             document = Document.objects.get(id=document_id)
-            document.status = 'failed'
+            document.status = "failed"
             document.save()
-            
+
             breakdown = Breakdown.objects.get(id=breakdown_id)
-            breakdown.status = 'failed'
+            breakdown.status = "failed"
             breakdown.save()
         except:
             pass
@@ -95,117 +430,121 @@ def upload_document(request):
     """
     Handle document upload and initiate AI breakdown.
     """
-    if request.method == 'POST':
-        if 'document' not in request.FILES:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Please select a file to upload.'
-                })
-            messages.error(request, 'Please select a file to upload.')
-            return redirect('breakdown:home')
-        
-        uploaded_file = request.FILES['document']
-        
+    if request.method == "POST":
+        if "document" not in request.FILES:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse(
+                    {"success": False, "error": "Please select a file to upload."}
+                )
+            messages.error(request, "Please select a file to upload.")
+            return redirect("breakdown:home")
+
+        uploaded_file = request.FILES["document"]
+
         # Validate file type
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-        allowed_extensions = [
-            ext.lower() for ext in settings.ALLOWED_FILE_TYPES
-        ]
+        allowed_extensions = [ext.lower() for ext in settings.ALLOWED_FILE_TYPES]
         if file_extension not in allowed_extensions:
             error_msg = (
-                f'File type {file_extension} is not supported. '
+                f"File type {file_extension} is not supported. "
                 f'Allowed types: {", ".join(allowed_extensions)}'
             )
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'error': error_msg})
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "error": error_msg})
             messages.error(request, error_msg)
-            return redirect('breakdown:home')
-        
+            return redirect("breakdown:home")
+
         # Handle ZIP uploads by unpacking and creating child documents
-        if file_extension == '.zip':
+        if file_extension == ".zip":
             document = Document.objects.create(
                 title=uploaded_file.name,
                 file=uploaded_file,
-                file_type='zip',
+                file_type="zip",
                 uploaded_by=(request.user if request.user.is_authenticated else None),
-                status='processing'
+                status="processing",
             )
             temp_dir = unpack_zip_to_temp(document.file.path)
             for root, _, files in os.walk(temp_dir):
                 for fname in files:
                     ext = os.path.splitext(fname)[1].lower()
-                    if ext.lstrip('.') not in ['pdf', 'docx', 'doc', 'txt']:
+                    if ext.lstrip(".") not in ["pdf", "docx", "doc", "txt"]:
                         continue
                     abs_path = os.path.join(root, fname)
-                    with open(abs_path, 'rb') as fh:
+                    with open(abs_path, "rb") as fh:
                         from django.core.files.base import ContentFile
+
                         content_file = ContentFile(fh.read(), name=fname)
                         child_doc = Document.objects.create(
                             title=fname,
                             file=content_file,
-                            file_type=ext.replace('.', ''),
-                            uploaded_by=(request.user if request.user.is_authenticated else None),
+                            file_type=ext.replace(".", ""),
+                            uploaded_by=(
+                                request.user if request.user.is_authenticated else None
+                            ),
                             parent_document=document,
-                            status='processing'
+                            status="processing",
                         )
                         child_bd = Breakdown.objects.create(
                             document=child_doc,
-                            content={'sections': []},
-                            raw_breakdown='',
-                            status='processing',
-                            ai_model_used='deepseek/deepseek-coder-33b-instruct'
+                            content={"sections": []},
+                            raw_breakdown="",
+                            status="processing",
+                            ai_model_used="deepseek/deepseek-coder-33b-instruct",
                         )
                         t = threading.Thread(
                             target=process_document_background,
-                            args=(child_doc.id, child_bd.id)
+                            args=(child_doc.id, child_bd.id),
                         )
                         t.daemon = True
                         t.start()
-            return redirect('breakdown:document_list')
+            return redirect("breakdown:document_list")
 
         # Create document record
         document = Document.objects.create(
             title=uploaded_file.name,
             file=uploaded_file,
-            file_type=file_extension.replace('.', ''),
+            file_type=file_extension.replace(".", ""),
             uploaded_by=request.user if request.user.is_authenticated else None,
-            status='processing'
+            status="processing",
         )
-        
+
         # Create a placeholder breakdown immediately
         placeholder_breakdown = Breakdown.objects.create(
             document=document,
-            content={'sections': []},
-            raw_breakdown='',
-            status='processing',
-            ai_model_used='deepseek/deepseek-coder-33b-instruct'
+            content={"sections": []},
+            raw_breakdown="",
+            status="processing",
+            ai_model_used="deepseek/deepseek-coder-33b-instruct",
         )
-        
+
         # Start background processing
         thread = threading.Thread(
             target=process_document_background,
-            args=(document.id, placeholder_breakdown.id)
+            args=(document.id, placeholder_breakdown.id),
         )
         thread.daemon = True
         thread.start()
-        
+
         # Redirect immediately to breakdown viewer
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'message': 'Document uploaded successfully!',
-                'redirect_url': reverse(
-                    'breakdown:breakdown_viewer',
-                    kwargs={'breakdown_id': placeholder_breakdown.id}
-                ),
-                'breakdown_id': placeholder_breakdown.id
-            })
-        
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Document uploaded successfully!",
+                    "redirect_url": reverse(
+                        "breakdown:breakdown_viewer",
+                        kwargs={"breakdown_id": placeholder_breakdown.id},
+                    ),
+                    "breakdown_id": placeholder_breakdown.id,
+                }
+            )
+
         # For non-AJAX requests, redirect immediately
-        return redirect('breakdown:breakdown_viewer', breakdown_id=placeholder_breakdown.id)
-    
-    return render(request, 'breakdown/upload.html')
+        return redirect(
+            "breakdown:breakdown_viewer", breakdown_id=placeholder_breakdown.id
+        )
+
+    return render(request, "breakdown/upload.html")
 
 
 def breakdown_detail(request, breakdown_id):
@@ -213,10 +552,11 @@ def breakdown_detail(request, breakdown_id):
     Display the detailed breakdown of a document.
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-    return render(request, 'breakdown/breakdown_detail.html', {
-        'breakdown': breakdown,
-        'document': breakdown.document
-    })
+    return render(
+        request,
+        "breakdown/breakdown_detail.html",
+        {"breakdown": breakdown, "document": breakdown.document},
+    )
 
 
 def breakdown_viewer(request, breakdown_id):
@@ -224,10 +564,11 @@ def breakdown_viewer(request, breakdown_id):
     Display the full breakdown viewer with markers and comments.
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-    return render(request, 'breakdown/breakdown_viewer.html', {
-        'breakdown': breakdown,
-        'document': breakdown.document
-    })
+    return render(
+        request,
+        "breakdown/breakdown_viewer.html",
+        {"breakdown": breakdown, "document": breakdown.document},
+    )
 
 
 def compare_split(request, breakdown_id):
@@ -236,60 +577,70 @@ def compare_split(request, breakdown_id):
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     document = breakdown.document
-    extraction_map = getattr(document, 'extraction_map', {}) or {}
+    extraction_map = getattr(document, "extraction_map", {}) or {}
 
     # Build anchored segments from extraction_map for precise jumps
     orig_segments = []
-    text = document.extracted_text or ''
+    text = document.extracted_text or ""
     try:
-        mtype = extraction_map.get('type')
-        if mtype == 'pdf':
-            for page in extraction_map.get('pages', []):
-                lines = page.get('lines', [])
+        mtype = extraction_map.get("type")
+        if mtype == "pdf":
+            for page in extraction_map.get("pages", []):
+                lines = page.get("lines", [])
                 if not lines:
                     continue
-                start = lines[0].get('char_start', 0)
-                end = lines[-1].get('char_end', 0)
+                start = lines[0].get("char_start", 0)
+                end = lines[-1].get("char_end", 0)
                 segment_text = text[start:end]
-                orig_segments.append({
-                    'id': f"page-{page.get('page', 0)}",
-                    'label': f"Page {page.get('page', 0)}",
-                    'start': start,
-                    'text': segment_text,
-                })
-        elif mtype == 'docx':
-            for para in extraction_map.get('paragraphs', []):
-                start = para.get('char_start', 0)
-                end = para.get('char_end', 0)
+                orig_segments.append(
+                    {
+                        "id": f"page-{page.get('page', 0)}",
+                        "label": f"Page {page.get('page', 0)}",
+                        "start": start,
+                        "text": segment_text,
+                    }
+                )
+        elif mtype == "docx":
+            for para in extraction_map.get("paragraphs", []):
+                start = para.get("char_start", 0)
+                end = para.get("char_end", 0)
                 segment_text = text[start:end]
-                orig_segments.append({
-                    'id': f"para-{para.get('index', 0)}",
-                    'label': f"Paragraph {para.get('index', 0)}",
-                    'start': start,
-                    'text': segment_text,
-                })
-        elif mtype in ('txt', 'doc'):
-            for line in extraction_map.get('lines', []):
-                start = line.get('char_start', 0)
-                end = line.get('char_end', 0)
+                orig_segments.append(
+                    {
+                        "id": f"para-{para.get('index', 0)}",
+                        "label": f"Paragraph {para.get('index', 0)}",
+                        "start": start,
+                        "text": segment_text,
+                    }
+                )
+        elif mtype in ("txt", "doc"):
+            for line in extraction_map.get("lines", []):
+                start = line.get("char_start", 0)
+                end = line.get("char_end", 0)
                 segment_text = text[start:end]
-                lid = line.get('line') or line.get('index') or 0
-                orig_segments.append({
-                    'id': f"line-{lid}",
-                    'label': f"Line {lid}",
-                    'start': start,
-                    'text': segment_text,
-                })
+                lid = line.get("line") or line.get("index") or 0
+                orig_segments.append(
+                    {
+                        "id": f"line-{lid}",
+                        "label": f"Line {lid}",
+                        "start": start,
+                        "text": segment_text,
+                    }
+                )
     except Exception:
         # Fallback: no segments
         orig_segments = []
 
-    return render(request, 'breakdown/compare_split.html', {
-        'breakdown': breakdown,
-        'document': document,
-        'extraction_map': extraction_map,
-        'orig_segments': orig_segments,
-    })
+    return render(
+        request,
+        "breakdown/compare_split.html",
+        {
+            "breakdown": breakdown,
+            "document": document,
+            "extraction_map": extraction_map,
+            "orig_segments": orig_segments,
+        },
+    )
 
 
 @csrf_exempt
@@ -302,87 +653,100 @@ def run_ai_workflow(request, breakdown_id):
         # logging removed
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
         document = breakdown.document
-        
+
         # logging removed
-        
+
         # Check if document has extracted text
         if not document.extracted_text:
-            return JsonResponse({
-                'success': False,
-                'error': 'No extracted text available. Please upload a document first.'
-            })
-        
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "No extracted text available. Please upload a document first.",
+                }
+            )
+
         # Get the workflow type and current content from the request
         data = json.loads(request.body)
-        workflow_type = data.get('workflow_type', 'breakdown')
-        current_content = data.get('current_content', document.extracted_text)
-        
+        workflow_type = data.get("workflow_type", "breakdown")
+        current_content = data.get("current_content", document.extracted_text)
+
         # logging removed
-        
+
         # Update status to processing
-        breakdown.status = 'processing'
+        breakdown.status = "processing"
         breakdown.save()
-        
+
         # logging removed
         # Run AI processing based on workflow type, using current content
         ai_service = AIBreakdownService()
-        
-        if workflow_type == 'breakdown':
+
+        if workflow_type == "breakdown":
             # logging removed
             result = ai_service.breakdown_document(current_content)
-        elif workflow_type == 'stepbystep':
+        elif workflow_type == "stepbystep":
             # logging removed
             # For step-by-step, create simplified action steps based on the content
             step_result = ai_service.create_step_by_step_guide(current_content)
             # Convert step-by-step result to expected format
             result = {
-                'success': True,
-                'breakdown': _format_step_by_step_result(step_result),
-                'raw_response': step_result.get('raw_response', ''),
-                'model_used': getattr(ai_service, 'model', 'Unknown'),
-                'step_by_step_data': step_result
+                "success": True,
+                "breakdown": _format_step_by_step_result(step_result),
+                "raw_response": step_result.get("raw_response", ""),
+                "model_used": getattr(ai_service, "model", "Unknown"),
+                "step_by_step_data": step_result,
             }
-        elif workflow_type == 'report':
+        elif workflow_type == "report":
             # logging removed
             # For report, create a detailed report reviewing both extracted text and breakdown
             result = ai_service.create_detailed_report(
-                document.extracted_text, 
-                current_content
+                document.extracted_text, current_content
             )
-        elif workflow_type == 'review-compare':
+        elif workflow_type == "review-compare":
             # logging removed
             result = ai_service.breakdown_document(current_content)
         else:
             # logging removed
             result = ai_service.breakdown_document(current_content)
-        
+
         # logging removed
-        
-        if result.get('success', False):
+
+        if result.get("success", False):
             # Update breakdown with results
-            if workflow_type == 'stepbystep':
+            if workflow_type == "stepbystep":
                 # For step-by-step, save the structured data but preserve original breakdown
-                if not hasattr(breakdown, 'step_by_step_content') or not breakdown.step_by_step_content:
+                if (
+                    not hasattr(breakdown, "step_by_step_content")
+                    or not breakdown.step_by_step_content
+                ):
                     # Store step-by-step content separately
-                    breakdown.step_by_step_content = result.get('step_by_step_data', {})
-                breakdown.raw_breakdown = result['raw_response']
+                    breakdown.step_by_step_content = result.get("step_by_step_data", {})
+                breakdown.raw_breakdown = result["raw_response"]
                 # Persist/Update document-scoped HowTo
                 try:
-                    steps_payload = result.get('step_by_step_data', {}).get('sections', [])
+                    steps_payload = result.get("step_by_step_data", {}).get(
+                        "sections", []
+                    )
                     normalized_steps = []
                     for i, sec in enumerate(steps_payload, start=1):
                         if isinstance(sec, dict):
-                            normalized_steps.append({
-                                'title': sec.get('title') or f'Step {i}',
-                                'content': sec.get('content') or ''
-                            })
+                            normalized_steps.append(
+                                {
+                                    "title": sec.get("title") or f"Step {i}",
+                                    "content": sec.get("content") or "",
+                                }
+                            )
                         else:
-                            normalized_steps.append({'title': f'Step {i}', 'content': str(sec)})
+                            normalized_steps.append(
+                                {"title": f"Step {i}", "content": str(sec)}
+                            )
                     howto, created = HowTo.objects.get_or_create(
                         breakdown=breakdown,
                         section=None,
-                        scope='document',
-                        defaults={'title': 'How to apply this document', 'steps': normalized_steps}
+                        scope="document",
+                        defaults={
+                            "title": "How to apply this document",
+                            "steps": normalized_steps,
+                        },
                     )
                     if not created:
                         howto.steps = normalized_steps
@@ -391,22 +755,22 @@ def run_ai_workflow(request, breakdown_id):
                     pass
             else:
                 # For other workflows, save structured content
-                breakdown.content = result['breakdown']
-                breakdown.raw_breakdown = result['raw_response']
+                breakdown.content = result["breakdown"]
+                breakdown.raw_breakdown = result["raw_response"]
                 # Populate Section rows if structured sections are available
                 try:
-                    sections = result['breakdown'].get('sections', [])
+                    sections = result["breakdown"].get("sections", [])
                     if sections and isinstance(sections, list):
                         # Clear previous sections on re-run
                         breakdown.sections.all().delete()
                         for idx, sec in enumerate(sections, start=1):
                             if isinstance(sec, dict):
-                                title = sec.get('title') or f'Section {idx}'
-                                body = sec.get('content') or sec.get('body') or ''
-                                pointers = sec.get('pointers', {})
+                                title = sec.get("title") or f"Section {idx}"
+                                body = sec.get("content") or sec.get("body") or ""
+                                pointers = sec.get("pointers", {})
                             else:
                                 # Legacy string section
-                                title = f'Section {idx}'
+                                title = f"Section {idx}"
                                 body = str(sec)
                                 pointers = {}
                             Section.objects.create(
@@ -429,7 +793,7 @@ def run_ai_workflow(request, breakdown_id):
                                 pass
                             # Section short summaries (cap to 15 to limit calls)
                             svc = AIBreakdownService()
-                            for s in breakdown.sections.all().order_by('order')[:15]:
+                            for s in breakdown.sections.all().order_by("order")[:15]:
                                 try:
                                     s.short_summary = svc.summarize_section(
                                         s.title, s.body
@@ -442,65 +806,65 @@ def run_ai_workflow(request, breakdown_id):
                 except Exception:
                     # Non-fatal; keep raw content
                     pass
-            
-            breakdown.ai_model_used = result.get('model_used', 'Unknown')
-            breakdown.status = 'completed'
+
+            breakdown.ai_model_used = result.get("model_used", "Unknown")
+            breakdown.status = "completed"
             breakdown.save()
-            
+
             # logging removed
-            return JsonResponse({
-                'success': True,
-                'message': f'{workflow_type.replace("-", " ").title()} completed successfully!',
-                'breakdown': result['breakdown'],
-                'step_by_step_data': result.get('step_by_step_data')
-            })
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": f'{workflow_type.replace("-", " ").title()} completed successfully!',
+                    "breakdown": result["breakdown"],
+                    "step_by_step_data": result.get("step_by_step_data"),
+                }
+            )
         else:
-            breakdown.status = 'failed'
+            breakdown.status = "failed"
             breakdown.save()
             # logging removed
-            return JsonResponse({
-                'success': False,
-                'error': result.get('error', 'AI processing failed')
-            })
-            
+            return JsonResponse(
+                {"success": False, "error": result.get("error", "AI processing failed")}
+            )
+
     except Exception as e:
         # logging removed
         import traceback
+
         traceback.print_exc()
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
 
 def _format_step_by_step_result(step_result):
     """
     Format step-by-step result for display.
-    
+
     Args:
         step_result: Result from create_step_by_step_guide
-        
+
     Returns:
         Formatted string for display
     """
-    if not step_result or 'sections' not in step_result:
+    if not step_result or "sections" not in step_result:
         return "No step-by-step data available"
-    
-    sections = step_result['sections']
+
+    sections = step_result["sections"]
     if not sections:
         return "No step-by-step data available"
-    
+
     # Format sections as a structured breakdown
     formatted_result = "Step-by-Step Analysis:\n\n"
-    
+
     for i, section in enumerate(sections):
         if isinstance(section, dict):
-            title = section.get('title', f'Step {i+1}')
-            content = section.get('content', '')
+            title = section.get("title", f"Step {i+1}")
+            content = section.get("content", "")
             formatted_result += f"{title}\n{content}\n\n"
         else:
             # Handle string sections
             formatted_result += f"{section}\n\n"
-    
+
     return formatted_result.strip()
 
 
@@ -514,19 +878,21 @@ def ask_question(request, breakdown_id):
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     document = breakdown.document
     try:
-        payload = json.loads(request.body or '{}')
-        question = payload.get('question', '').strip()
-        scope = payload.get('scope', 'section')
-        section_id = payload.get('section_id')
+        payload = json.loads(request.body or "{}")
+        question = payload.get("question", "").strip()
+        scope = payload.get("scope", "section")
+        section_id = payload.get("section_id")
         if not question:
-            return JsonResponse({'success': False, 'error': 'Question is required'}, status=400)
+            return JsonResponse(
+                {"success": False, "error": "Question is required"}, status=400
+            )
 
         # Build context based on scope
-        context_text = ''
-        if scope == 'document':
-            context_text = document.extracted_text or ''
-        elif scope == 'neighbors' and section_id:
-            sec_qs = list(breakdown.sections.all().order_by('order'))
+        context_text = ""
+        if scope == "document":
+            context_text = document.extracted_text or ""
+        elif scope == "neighbors" and section_id:
+            sec_qs = list(breakdown.sections.all().order_by("order"))
             try:
                 idx = next(i for i, s in enumerate(sec_qs) if s.id == int(section_id))
             except StopIteration:
@@ -538,7 +904,7 @@ def ask_question(request, breakdown_id):
             s = get_object_or_404(Section, id=section_id, breakdown=breakdown)
             context_text = s.body
         else:
-            context_text = document.extracted_text or ''
+            context_text = document.extracted_text or ""
 
         # Compose prompt with citation requirement
         prompt = (
@@ -547,28 +913,37 @@ def ask_question(request, breakdown_id):
             "CONTEXT:\n" + context_text[:8000] + "\n\nQUESTION: " + question
         )
         ai = AIBreakdownService()
-        raw = ai._make_request(prompt) or ''
-        answer_text = ''
+        raw = ai._make_request(prompt) or ""
+        answer_text = ""
         citations = []
         try:
             parsed = json.loads(raw)
-            answer_text = parsed.get('answer', '')
-            citations = parsed.get('citations', []) or []
+            answer_text = parsed.get("answer", "")
+            citations = parsed.get("citations", []) or []
         except Exception:
             answer_text = raw.strip()
             citations = []
 
         qa = QAEntry.objects.create(
             breakdown=breakdown,
-            section=Section.objects.filter(id=section_id).first() if section_id else None,
+            section=(
+                Section.objects.filter(id=section_id).first() if section_id else None
+            ),
             scope=scope,
             question=question,
             answer=answer_text,
             citations=citations,
         )
-        return JsonResponse({'success': True, 'answer': answer_text, 'citations': citations, 'qa_id': qa.id})
+        return JsonResponse(
+            {
+                "success": True,
+                "answer": answer_text,
+                "citations": citations,
+                "qa_id": qa.id,
+            }
+        )
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -580,26 +955,28 @@ def ask_on_text(request, breakdown_id):
     """
     _ = get_object_or_404(Breakdown, id=breakdown_id)
     try:
-        payload = json.loads(request.body or '{}')
-        text = (payload.get('text') or '').strip()
-        question = (payload.get('question') or '').strip()
+        payload = json.loads(request.body or "{}")
+        text = (payload.get("text") or "").strip()
+        question = (payload.get("question") or "").strip()
         if not text or not question:
-            return JsonResponse({'success': False, 'error': 'text and question required'}, status=400)
+            return JsonResponse(
+                {"success": False, "error": "text and question required"}, status=400
+            )
         prompt = (
             "Answer the question concisely using ONLY the provided context. "
             "Return JSON with field 'answer' (string).\n\n"
             "CONTEXT:\n" + text[:8000] + "\n\nQUESTION: " + question
         )
         ai = AIBreakdownService()
-        raw = ai._make_request(prompt) or ''
+        raw = ai._make_request(prompt) or ""
         try:
             parsed = json.loads(raw)
-            answer_text = parsed.get('answer', raw.strip())
+            answer_text = parsed.get("answer", raw.strip())
         except Exception:
             answer_text = raw.strip()
-        return JsonResponse({'success': True, 'answer': answer_text})
+        return JsonResponse({"success": True, "answer": answer_text})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -613,8 +990,8 @@ def propose_section_update(request, breakdown_id, section_id):
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
-    data = json.loads(request.body or '{}')
-    user_prompt = (data.get('prompt') or '').strip()
+    data = json.loads(request.body or "{}")
+    user_prompt = (data.get("prompt") or "").strip()
     base = (
         "You are improving a section of a document. Rewrite the section content "
         "to be clearer, more complete, and logically structured. Keep factual accuracy. "
@@ -626,28 +1003,37 @@ def propose_section_update(request, breakdown_id, section_id):
     )
     try:
         ai = AIBreakdownService()
-        raw = ai._make_request(composed) or ''
+        raw = ai._make_request(composed) or ""
         title, content = section.title, section.body
         try:
             parsed = json.loads(raw)
-            title = parsed.get('title') or title
-            content = parsed.get('content') or content
+            title = parsed.get("title") or title
+            content = parsed.get("content") or content
         except Exception:
             # Fallback: use raw text as content
             content = raw.strip() or content
         # Store as a proposed revision
         rev = Revision.objects.create(
             breakdown=breakdown,
-            target_type='section',
+            target_type="section",
             target_id=section.id,
-            before={'title': section.title, 'content': section.body},
-            after={'title': (title or section.title)[:255], 'content': content or section.body},
-            status='proposed',
-            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+            before={"title": section.title, "content": section.body},
+            after={
+                "title": (title or section.title)[:255],
+                "content": content or section.body,
+            },
+            status="proposed",
+            user=(
+                request.user
+                if getattr(request, "user", None) and request.user.is_authenticated
+                else None
+            ),
         )
-        return JsonResponse({'success': True, 'title': title, 'content': content, 'revision_id': rev.id})
+        return JsonResponse(
+            {"success": True, "title": title, "content": content, "revision_id": rev.id}
+        )
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -660,51 +1046,59 @@ def apply_section_update(request, breakdown_id, section_id):
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
     try:
-        data = json.loads(request.body or '{}')
-        title = (data.get('title') or section.title)[:255]
-        content = data.get('content') or section.body
+        data = json.loads(request.body or "{}")
+        title = (data.get("title") or section.title)[:255]
+        content = data.get("content") or section.body
         # If a proposed revision id provided, mark it accepted, else create accepted record
-        rev_id = data.get('revision_id')
+        rev_id = data.get("revision_id")
         if rev_id:
             try:
                 rv = Revision.objects.get(id=int(rev_id), breakdown=breakdown)
-                if rv.target_type == 'section' and int(rv.target_id) == int(section.id):
-                    rv.status = 'accepted'
-                    rv.save(update_fields=['status', 'updated_at'])
+                if rv.target_type == "section" and int(rv.target_id) == int(section.id):
+                    rv.status = "accepted"
+                    rv.save(update_fields=["status", "updated_at"])
             except Exception:
                 pass
         else:
             Revision.objects.create(
                 breakdown=breakdown,
-                target_type='section',
+                target_type="section",
                 target_id=section.id,
-                before={'title': section.title, 'content': section.body},
-                after={'title': title, 'content': content},
-                status='accepted',
-                user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+                before={"title": section.title, "content": section.body},
+                after={"title": title, "content": content},
+                status="accepted",
+                user=(
+                    request.user
+                    if getattr(request, "user", None) and request.user.is_authenticated
+                    else None
+                ),
             )
         # Create revision (proposed->accepted immediately since user clicked Apply)
         Revision.objects.create(
             breakdown=breakdown,
-            target_type='section',
+            target_type="section",
             target_id=section.id,
-            before={'title': section.title, 'content': section.body},
-            after={'title': title, 'content': content},
-            status='accepted',
-            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+            before={"title": section.title, "content": section.body},
+            after={"title": title, "content": content},
+            status="accepted",
+            user=(
+                request.user
+                if getattr(request, "user", None) and request.user.is_authenticated
+                else None
+            ),
         )
         section.title = title
         section.body = content
         section.save()
         # Rebuild breakdown.content from sections
         rebuilt = []
-        for s in breakdown.sections.all().order_by('order'):
-            rebuilt.append({'title': s.title, 'content': s.body})
-        breakdown.content = {'sections': rebuilt}
+        for s in breakdown.sections.all().order_by("order"):
+            rebuilt.append({"title": s.title, "content": s.body})
+        breakdown.content = {"sections": rebuilt}
         breakdown.save()
-        return JsonResponse({'success': True, 'title': title, 'content': content})
+        return JsonResponse({"success": True, "title": title, "content": content})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -717,33 +1111,43 @@ def revert_section_revision(request, breakdown_id, section_id, revision_id):
     section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
     revision = get_object_or_404(Revision, id=revision_id, breakdown=breakdown)
     # Ensure target matches
-    if revision.target_type != 'section' or int(revision.target_id) != int(section.id):
-        return JsonResponse({'success': False, 'error': 'Revision does not apply to this section'}, status=400)
+    if revision.target_type != "section" or int(revision.target_id) != int(section.id):
+        return JsonResponse(
+            {"success": False, "error": "Revision does not apply to this section"},
+            status=400,
+        )
     try:
         before_payload = revision.before or {}
-        new_title = (before_payload.get('title') or section.title)[:255]
-        new_content = before_payload.get('content') or section.body
+        new_title = (before_payload.get("title") or section.title)[:255]
+        new_content = before_payload.get("content") or section.body
         # Record a new accepted revision capturing this revert
         Revision.objects.create(
             breakdown=breakdown,
-            target_type='section',
+            target_type="section",
             target_id=section.id,
-            before={'title': section.title, 'content': section.body},
-            after={'title': new_title, 'content': new_content},
-            status='accepted',
-            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+            before={"title": section.title, "content": section.body},
+            after={"title": new_title, "content": new_content},
+            status="accepted",
+            user=(
+                request.user
+                if getattr(request, "user", None) and request.user.is_authenticated
+                else None
+            ),
         )
         # Apply change
         section.title = new_title
         section.body = new_content
         section.save()
         # Rebuild breakdown.content from sections
-        rebuilt = [{'title': s.title, 'content': s.body} for s in breakdown.sections.all().order_by('order')]
-        breakdown.content = {'sections': rebuilt}
+        rebuilt = [
+            {"title": s.title, "content": s.body}
+            for s in breakdown.sections.all().order_by("order")
+        ]
+        breakdown.content = {"sections": rebuilt}
         breakdown.save()
-        return JsonResponse({'success': True})
+        return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -755,14 +1159,17 @@ def reject_section_revision(request, breakdown_id, section_id, revision_id):
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
     revision = get_object_or_404(Revision, id=revision_id, breakdown=breakdown)
-    if revision.target_type != 'section' or int(revision.target_id) != int(section.id):
-        return JsonResponse({'success': False, 'error': 'Revision does not apply to this section'}, status=400)
+    if revision.target_type != "section" or int(revision.target_id) != int(section.id):
+        return JsonResponse(
+            {"success": False, "error": "Revision does not apply to this section"},
+            status=400,
+        )
     try:
-        revision.status = 'rejected'
-        revision.save(update_fields=['status', 'updated_at'])
-        return JsonResponse({'success': True})
+        revision.status = "rejected"
+        revision.save(update_fields=["status", "updated_at"])
+        return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -782,35 +1189,43 @@ def section_step_by_step(request, breakdown_id, section_id):
         "troubleshooting tips. Use clear headings, numbered steps, substeps, and include WHY each step matters. "
         "Where possible, include both GUI and CLI paths. Format code blocks with proper fencing and label the shell "
         "(powershell, bash). If the content requests a report or a word count (e.g., 600 words), generate a fluent, "
-        "no-fluff report instead, with numbered sections and image placeholders (e.g., \"Figure 1.1: …\"). Minimum "
+        'no-fluff report instead, with numbered sections and image placeholders (e.g., "Figure 1.1: …"). Minimum '
         "500 words unless a higher count is specified.\n\nCONTENT:\n" + section.body
     )
     try:
         ai = AIBreakdownService()
-        raw = ai._make_request(guide_prompt) or ''
+        raw = ai._make_request(guide_prompt) or ""
         # Parse into steps using breakdown parser for consistency
         parsed = ai._parse_breakdown_response(raw)
-        steps_payload = parsed.get('sections', [])
+        steps_payload = parsed.get("sections", [])
         normalized_steps = []
         for i, sec in enumerate(steps_payload, start=1):
             if isinstance(sec, dict):
-                normalized_steps.append({'title': sec.get('title') or f'Step {i}', 'content': sec.get('content') or ''})
+                normalized_steps.append(
+                    {
+                        "title": sec.get("title") or f"Step {i}",
+                        "content": sec.get("content") or "",
+                    }
+                )
             else:
-                normalized_steps.append({'title': f'Step {i}', 'content': str(sec)})
+                normalized_steps.append({"title": f"Step {i}", "content": str(sec)})
         # Upsert section-scoped HowTo
         howto, created = HowTo.objects.get_or_create(
             breakdown=breakdown,
             section=section,
-            scope='section',
-            defaults={'title': f'How to apply: {section.title}', 'steps': normalized_steps}
+            scope="section",
+            defaults={
+                "title": f"How to apply: {section.title}",
+                "steps": normalized_steps,
+            },
         )
         if not created:
             howto.steps = normalized_steps
-            howto.title = f'How to apply: {section.title}'
+            howto.title = f"How to apply: {section.title}"
             howto.save()
-        return JsonResponse({'success': True, 'steps': normalized_steps})
+        return JsonResponse({"success": True, "steps": normalized_steps})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @require_http_methods(["GET"])
@@ -821,32 +1236,38 @@ def get_section(request, breakdown_id, section_id):
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
     section = get_object_or_404(Section, id=section_id, breakdown=breakdown)
     howtos = section.howtos.all()
-    return JsonResponse({
-        'success': True,
-        'section': {
-            'id': section.id,
-            'order': section.order,
-            'title': section.title,
-            'short_summary': section.short_summary,
-            'body': section.body,
-            'pointers': section.pointers,
-        },
-        'howtos': [
-            {
-                'title': h.title,
-                'steps': h.steps,
-            } for h in howtos
-        ],
-        'revisions': [
-            {
-                'id': rv.id,
-                'status': rv.status,
-                'created_at': rv.created_at.isoformat(),
-                'before': rv.before,
-                'after': rv.after,
-            } for rv in Revision.objects.filter(breakdown=breakdown, target_type='section', target_id=section.id).order_by('-created_at')[:10]
-        ],
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "section": {
+                "id": section.id,
+                "order": section.order,
+                "title": section.title,
+                "short_summary": section.short_summary,
+                "body": section.body,
+                "pointers": section.pointers,
+            },
+            "howtos": [
+                {
+                    "title": h.title,
+                    "steps": h.steps,
+                }
+                for h in howtos
+            ],
+            "revisions": [
+                {
+                    "id": rv.id,
+                    "status": rv.status,
+                    "created_at": rv.created_at.isoformat(),
+                    "before": rv.before,
+                    "after": rv.after,
+                }
+                for rv in Revision.objects.filter(
+                    breakdown=breakdown, target_type="section", target_id=section.id
+                ).order_by("-created_at")[:10]
+            ],
+        }
+    )
 
 
 @csrf_exempt
@@ -856,33 +1277,33 @@ def regenerate_breakdown(request, breakdown_id):
     Regenerate the breakdown for a document using AI.
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-    
+
     try:
         ai_service = AIBreakdownService()
-        breakdown_result = ai_service.breakdown_document(breakdown.document.extracted_text)
-        
-        if breakdown_result['success']:
-            breakdown.content = breakdown_result['breakdown']
-            breakdown.raw_breakdown = breakdown_result['raw_response']
-            breakdown.ai_model_used = breakdown_result['model_used']
+        breakdown_result = ai_service.breakdown_document(
+            breakdown.document.extracted_text
+        )
+
+        if breakdown_result["success"]:
+            breakdown.content = breakdown_result["breakdown"]
+            breakdown.raw_breakdown = breakdown_result["raw_response"]
+            breakdown.ai_model_used = breakdown_result["model_used"]
             breakdown.save()
-            
-            return JsonResponse({
-                'success': True,
-                'breakdown': breakdown_result['breakdown'],
-                'message': 'Breakdown regenerated successfully'
-            })
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "breakdown": breakdown_result["breakdown"],
+                    "message": "Breakdown regenerated successfully",
+                }
+            )
         else:
-            return JsonResponse({
-                'success': False,
-                'error': breakdown_result['error']
-            }, status=400)
-            
+            return JsonResponse(
+                {"success": False, "error": breakdown_result["error"]}, status=400
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -892,19 +1313,18 @@ def custom_prompt(request, breakdown_id):
     Handle custom AI prompts for breakdown improvement.
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-    
+
     try:
         data = json.loads(request.body)
-        prompt = data.get('prompt', '')
-        markers = data.get('markers', [])
-        comments = data.get('comments', {})
-        
+        prompt = data.get("prompt", "")
+        markers = data.get("markers", [])
+        comments = data.get("comments", {})
+
         if not prompt:
-            return JsonResponse({
-                'success': False,
-                'error': 'No prompt provided'
-            }, status=400)
-        
+            return JsonResponse(
+                {"success": False, "error": "No prompt provided"}, status=400
+            )
+
         # Create enhanced prompt with user feedback
         enhanced_prompt = f"""
 {prompt}
@@ -920,34 +1340,32 @@ User Comments:
 
 Please review and improve the breakdown based on the user's feedback.
 """
-        
+
         # Send to AI
         ai_service = AIBreakdownService()
         breakdown_result = ai_service.breakdown_document(enhanced_prompt)
-        
-        if breakdown_result['success']:
+
+        if breakdown_result["success"]:
             # Create new breakdown or update existing
-            breakdown.content = breakdown_result['breakdown']
-            breakdown.raw_breakdown = breakdown_result['raw_response']
-            breakdown.ai_model_used = breakdown_result['model_used']
+            breakdown.content = breakdown_result["breakdown"]
+            breakdown.raw_breakdown = breakdown_result["raw_response"]
+            breakdown.ai_model_used = breakdown_result["model_used"]
             breakdown.save()
-            
-            return JsonResponse({
-                'success': True,
-                'breakdown': breakdown_result['breakdown'],
-                'message': 'Breakdown updated with custom prompt'
-            })
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "breakdown": breakdown_result["breakdown"],
+                    "message": "Breakdown updated with custom prompt",
+                }
+            )
         else:
-            return JsonResponse({
-                'success': False,
-                'error': breakdown_result['error']
-            }, status=400)
-            
+            return JsonResponse(
+                {"success": False, "error": breakdown_result["error"]}, status=400
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -957,12 +1375,12 @@ def regenerate_with_comments(request, breakdown_id):
     Regenerate the breakdown taking into account user comments and markers.
     """
     breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-    
+
     try:
         data = json.loads(request.body)
-        comments = data.get('comments', '')
-        markers = data.get('markers', [])
-        
+        comments = data.get("comments", "")
+        markers = data.get("markers", [])
+
         # Create enhanced prompt with comments
         enhanced_prompt = f"""
 Please regenerate the following breakdown taking into account the user's comments and feedback:
@@ -978,33 +1396,31 @@ User Markers:
 
 Please improve the breakdown based on the user's feedback while maintaining the original structure and content.
 """
-        
+
         # Send to AI
         ai_service = AIBreakdownService()
         breakdown_result = ai_service.breakdown_document(enhanced_prompt)
-        
-        if breakdown_result['success']:
-            breakdown.content = breakdown_result['breakdown']
-            breakdown.raw_breakdown = breakdown_result['raw_response']
-            breakdown.ai_model_used = breakdown_result['model_used']
+
+        if breakdown_result["success"]:
+            breakdown.content = breakdown_result["breakdown"]
+            breakdown.raw_breakdown = breakdown_result["raw_response"]
+            breakdown.ai_model_used = breakdown_result["model_used"]
             breakdown.save()
-            
-            return JsonResponse({
-                'success': True,
-                'breakdown': breakdown_result['breakdown'],
-                'message': 'Breakdown regenerated with comments'
-            })
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "breakdown": breakdown_result["breakdown"],
+                    "message": "Breakdown regenerated with comments",
+                }
+            )
         else:
-            return JsonResponse({
-                'success': False,
-                'error': breakdown_result['error']
-            }, status=400)
-            
+            return JsonResponse(
+                {"success": False, "error": breakdown_result["error"]}, status=400
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @csrf_exempt
@@ -1016,35 +1432,31 @@ def save_extracted_text(request, document_id):
     try:
         document = get_object_or_404(Document, id=document_id)
         data = json.loads(request.body)
-        new_text = data.get('extracted_text', '')
-        
+        new_text = data.get("extracted_text", "")
+
         if not new_text.strip():
-            return JsonResponse({
-                'success': False,
-                'error': 'Extracted text cannot be empty'
-            }, status=400)
-        
+            return JsonResponse(
+                {"success": False, "error": "Extracted text cannot be empty"},
+                status=400,
+            )
+
         # Update the extracted text
         document.extracted_text = new_text
         document.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Extracted text updated successfully'
-        })
-        
+
+        return JsonResponse(
+            {"success": True, "message": "Extracted text updated successfully"}
+        )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 def custom_ai_view(request):
     """
     View for the custom AI analysis page.
     """
-    return render(request, 'customai.html')
+    return render(request, "customai.html")
 
 
 @csrf_exempt
@@ -1056,37 +1468,43 @@ def custom_ai_process(request):
     Returns JSON: { success: bool, response: string, model_used: string }
     """
     try:
-        data = json.loads(request.body or '{}')
-        prompt = data.get('prompt', '').strip()
-        content = data.get('content', '').strip()
-        prompt_type = data.get('prompt_type', '').strip()
+        data = json.loads(request.body or "{}")
+        prompt = data.get("prompt", "").strip()
+        content = data.get("content", "").strip()
+        prompt_type = data.get("prompt_type", "").strip()
 
         if not prompt:
-            return JsonResponse({
-                'success': False,
-                'error': 'Prompt is required'
-            }, status=400)
+            return JsonResponse(
+                {"success": False, "error": "Prompt is required"}, status=400
+            )
 
         ai_service = AIBreakdownService()
 
         # If user asks for a report, generate a full report instead of step-by-step
-        wants_report = any(k in (prompt + " " + content).lower() for k in [
-            ' report', 'write a report', 'word report', '600 word', '500 word'
-        ])
+        wants_report = any(
+            k in (prompt + " " + content).lower()
+            for k in [
+                " report",
+                "write a report",
+                "word report",
+                "600 word",
+                "500 word",
+            ]
+        )
 
         # Prefer standardized template when a known prompt_type is provided
-        if prompt_type == 'detailed-steps':
+        if prompt_type == "detailed-steps":
             template = ai_service._load_step_by_step_prompt_template()
             if template:
-                full_prompt = template.replace('{INPUT_TEXT}', content)
+                full_prompt = template.replace("{INPUT_TEXT}", content)
             else:
                 # Minimal robust fallback
                 full_prompt = (
-                    'Create a beginner-friendly, step-by-step guide with numbered '
-                    'steps, WHY each step matters, Windows (PowerShell) and '
-                    'Linux/macOS (bash) commands, config snippets, verification '
-                    'checks, troubleshooting tips, and official download links.\n\n'
-                    f'Input:\n{content}'
+                    "Create a beginner-friendly, step-by-step guide with numbered "
+                    "steps, WHY each step matters, Windows (PowerShell) and "
+                    "Linux/macOS (bash) commands, config snippets, verification "
+                    "checks, troubleshooting tips, and official download links.\n\n"
+                    f"Input:\n{content}"
                 )
             # First, generate the step-by-step guide
             steps_result = ai_service.run_freeform_prompt(full_prompt)
@@ -1094,43 +1512,52 @@ def custom_ai_process(request):
             # If a report was requested too, generate and append it
             if wants_report:
                 report = ai_service.create_detailed_report(content, content)
-                combined_text = ''
-                if steps_result.get('success'):
-                    combined_text += steps_result.get('response', '')
-                if report and report.get('sections'):
+                combined_text = ""
+                if steps_result.get("success"):
+                    combined_text += steps_result.get("response", "")
+                if report and report.get("sections"):
                     parts = []
-                    for idx, sec in enumerate(report['sections'], start=1):
-                        title = sec.get('title', f'Section {idx}')
-                        body = sec.get('content', '')
+                    for idx, sec in enumerate(report["sections"], start=1):
+                        title = sec.get("title", f"Section {idx}")
+                        body = sec.get("content", "")
                         parts.append(f"{title}\n{body}")
                     combined_text += "\n\n" + "\n\n".join(parts)
-                return JsonResponse({
-                    'success': True,
-                    'response': combined_text.strip() or 'No content generated',
-                    'model_used': getattr(ai_service, 'model', 'Unknown')
-                })
+                return JsonResponse(
+                    {
+                        "success": True,
+                        "response": combined_text.strip() or "No content generated",
+                        "model_used": getattr(ai_service, "model", "Unknown"),
+                    }
+                )
 
             # Otherwise just return the step-by-step output
-            return JsonResponse({
-                'success': steps_result.get('success', False),
-                'response': steps_result.get('response', '') or 'No content generated',
-                'model_used': steps_result.get('model_used', getattr(ai_service, 'model', 'Unknown'))
-            })
+            return JsonResponse(
+                {
+                    "success": steps_result.get("success", False),
+                    "response": steps_result.get("response", "")
+                    or "No content generated",
+                    "model_used": steps_result.get(
+                        "model_used", getattr(ai_service, "model", "Unknown")
+                    ),
+                }
+            )
 
         # If user asks for a report but no detailed-steps were requested, return only the report
         if wants_report:
             report = ai_service.create_detailed_report(content, content)
-            if report and report.get('sections'):
+            if report and report.get("sections"):
                 parts = []
-                for idx, sec in enumerate(report['sections'], start=1):
-                    title = sec.get('title', f'Section {idx}')
-                    body = sec.get('content', '')
+                for idx, sec in enumerate(report["sections"], start=1):
+                    title = sec.get("title", f"Section {idx}")
+                    body = sec.get("content", "")
                     parts.append(f"{title}\n{body}")
-                return JsonResponse({
-                    'success': True,
-                    'response': "\n\n".join(parts),
-                    'model_used': report.get('model_used', 'Unknown')
-                })
+                return JsonResponse(
+                    {
+                        "success": True,
+                        "response": "\n\n".join(parts),
+                        "model_used": report.get("model_used", "Unknown"),
+                    }
+                )
         else:
             # If content is provided, append it beneath the prompt with clear delimiter
             full_prompt = prompt
@@ -1139,33 +1566,33 @@ def custom_ai_process(request):
 
         result = ai_service.run_freeform_prompt(full_prompt)
 
-        if result.get('success'):
-            return JsonResponse({
-                'success': True,
-                'response': result.get('response', ''),
-                'model_used': result.get('model_used', 'Unknown')
-            })
+        if result.get("success"):
+            return JsonResponse(
+                {
+                    "success": True,
+                    "response": result.get("response", ""),
+                    "model_used": result.get("model_used", "Unknown"),
+                }
+            )
         else:
-            return JsonResponse({
-                'success': False,
-                'error': result.get('error', 'AI request failed'),
-                'model_used': result.get('model_used', 'Unknown')
-            }, status=502)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": result.get("error", "AI request failed"),
+                    "model_used": result.get("model_used", "Unknown"),
+                },
+                status=502,
+            )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 def document_list(request):
     """
     Display a list of all uploaded documents.
     """
-    documents = Document.objects.all().order_by('-uploaded_at')
-    return render(request, 'breakdown/document_list.html', {
-        'documents': documents
-    })
+    documents = Document.objects.all().order_by("-uploaded_at")
+    return render(request, "breakdown/document_list.html", {"documents": documents})
 
 
 def delete_document(request, document_id):
@@ -1173,8 +1600,8 @@ def delete_document(request, document_id):
     Delete a document and its associated files.
     """
     document = get_object_or_404(Document, id=document_id)
-    
-    if request.method == 'POST':
+
+    if request.method == "POST":
         try:
             # If this is an original document, delete all generated files first
             if document.is_original():
@@ -1184,28 +1611,31 @@ def delete_document(request, document_id):
                     if generated_file.file:
                         default_storage.delete(generated_file.file.name)
                     generated_file.delete()
-                messages.success(request, f'Document "{document.title}" and {generated_files.count()} generated files deleted successfully.')
+                messages.success(
+                    request,
+                    f'Document "{document.title}" and {generated_files.count()} generated files deleted successfully.',
+                )
             else:
                 # This is a generated file, just delete it
                 if document.file:
                     default_storage.delete(document.file.name)
-                messages.success(request, f'Generated file "{document.title}" deleted successfully.')
-            
+                messages.success(
+                    request, f'Generated file "{document.title}" deleted successfully.'
+                )
+
             # Delete the original document file from storage
             if document.file:
                 default_storage.delete(document.file.name)
-            
+
             document.delete()
-            
+
         except Exception as e:
-            messages.error(request, f'Error deleting document: {str(e)}')
-            return redirect('breakdown:document_list')
-        
-        return redirect('breakdown:home')
-    
-    return render(request, 'breakdown/delete_confirm.html', {
-        'document': document
-    })
+            messages.error(request, f"Error deleting document: {str(e)}")
+            return redirect("breakdown:document_list")
+
+        return redirect("breakdown:home")
+
+    return render(request, "breakdown/delete_confirm.html", {"document": document})
 
 
 @csrf_exempt
@@ -1216,42 +1646,28 @@ def upload_progress(request, document_id):
     """
     try:
         document = get_object_or_404(Document, id=document_id)
-        
-        progress_data = {
-            'status': document.status,
-            'progress': 0,
-            'message': ''
-        }
-        
-        if document.status == 'uploaded':
-            progress_data.update({
-                'progress': 25,
-                'message': 'Document uploaded, extracting text...'
-            })
-        elif document.status == 'processing':
-            progress_data.update({
-                'progress': 50,
-                'message': 'Extracting text from document...'
-            })
-        elif document.status == 'completed':
-            progress_data.update({
-                'progress': 75,
-                'message': 'Generating AI breakdown...'
-            })
-        elif document.status == 'failed':
-            progress_data.update({
-                'progress': 0,
-                'message': 'Processing failed'
-            })
-        
+
+        progress_data = {"status": document.status, "progress": 0, "message": ""}
+
+        if document.status == "uploaded":
+            progress_data.update(
+                {"progress": 25, "message": "Document uploaded, extracting text..."}
+            )
+        elif document.status == "processing":
+            progress_data.update(
+                {"progress": 50, "message": "Extracting text from document..."}
+            )
+        elif document.status == "completed":
+            progress_data.update(
+                {"progress": 75, "message": "Generating AI breakdown..."}
+            )
+        elif document.status == "failed":
+            progress_data.update({"progress": 0, "message": "Processing failed"})
+
         return JsonResponse(progress_data)
-        
+
     except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'progress': 0,
-            'message': str(e)
-        })
+        return JsonResponse({"status": "error", "progress": 0, "message": str(e)})
 
 
 @csrf_exempt
@@ -1263,53 +1679,58 @@ def edit_breakdown_section(request, breakdown_id):
     try:
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
         data = json.loads(request.body)
-        
-        section_id = data.get('section_id')
-        new_title = data.get('title')
-        new_content = data.get('content')
-        
+
+        section_id = data.get("section_id")
+        new_title = data.get("title")
+        new_content = data.get("content")
+
         if not all([section_id, new_title, new_content]):
-            return JsonResponse({
-                'success': False,
-                'error': 'Missing required fields: section_id, title, or content'
-            })
-        
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Missing required fields: section_id, title, or content",
+                }
+            )
+
         # Get current breakdown content
         current_content = breakdown.content
-        
+
         # Update the specific section
-        if 'sections' in current_content and isinstance(current_content['sections'], list):
+        if "sections" in current_content and isinstance(
+            current_content["sections"], list
+        ):
             # Find and update the section by index (1-based)
-            for i, section in enumerate(current_content['sections']):
+            for i, section in enumerate(current_content["sections"]):
                 if str(i + 1) == str(section_id):
                     # Support both dict-based sections and legacy string sections
                     if isinstance(section, dict):
-                        section['title'] = new_title
-                        section['content'] = new_content
-                        current_content['sections'][i] = section
+                        section["title"] = new_title
+                        section["content"] = new_content
+                        current_content["sections"][i] = section
                     else:
                         # Convert string section to structured dict
-                        current_content['sections'][i] = {
-                            'title': new_title,
-                            'content': new_content
+                        current_content["sections"][i] = {
+                            "title": new_title,
+                            "content": new_content,
                         }
                     break
-        
+
         # Save the updated breakdown
         breakdown.content = current_content
         breakdown.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Section updated successfully',
-            'updated_content': current_content
-        })
-        
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Section updated successfully",
+                "updated_content": current_content,
+            }
+        )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Error updating section: {str(e)}'
-        })
+        return JsonResponse(
+            {"success": False, "error": f"Error updating section: {str(e)}"}
+        )
 
 
 @csrf_exempt
@@ -1320,26 +1741,23 @@ def breakdown_status(request, breakdown_id):
     """
     try:
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
-        
+
         status_data = {
-            'status': breakdown.status,
-            'has_content': bool(breakdown.content.get('sections', [])),
-            'has_raw_breakdown': bool(breakdown.raw_breakdown),
-            'document_status': breakdown.document.status,
-            'ai_model_used': breakdown.ai_model_used,
-            'document': {
-                'extracted_text': breakdown.document.extracted_text,
-                'status': breakdown.document.status
-            }
+            "status": breakdown.status,
+            "has_content": bool(breakdown.content.get("sections", [])),
+            "has_raw_breakdown": bool(breakdown.raw_breakdown),
+            "document_status": breakdown.document.status,
+            "ai_model_used": breakdown.ai_model_used,
+            "document": {
+                "extracted_text": breakdown.document.extracted_text,
+                "status": breakdown.document.status,
+            },
         }
-        
+
         return JsonResponse(status_data)
-        
+
     except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'error': str(e)
-        })
+        return JsonResponse({"status": "error", "error": str(e)})
 
 
 @csrf_exempt
@@ -1351,102 +1769,109 @@ def save_document(request, breakdown_id):
     try:
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
         data = json.loads(request.body)
-        
-        document_type = data.get('document_type')  # 'breakdown' or 'report'
-        file_format = data.get('file_format')  # 'pdf' or 'docx'
-        custom_filename = (data.get('filename') or '').strip()
-        
+
+        document_type = data.get("document_type")  # 'breakdown' or 'report'
+        file_format = data.get("file_format")  # 'pdf' or 'docx'
+        custom_filename = (data.get("filename") or "").strip()
+
         if not all([document_type, file_format]):
-            return JsonResponse({
-                'success': False,
-                'error': 'Missing required fields: document_type or file_format'
-            })
-        
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Missing required fields: document_type or file_format",
+                }
+            )
+
         # Get the original document name
         original_name = breakdown.document.title
-        if '.' in original_name:
-            original_name = original_name.rsplit('.', 1)[0]
-        
+        if "." in original_name:
+            original_name = original_name.rsplit(".", 1)[0]
+
         # Create filename based on type or use custom override (without extension)
         if custom_filename:
             import re as _re
-            base = _re.sub(r'[^A-Za-z0-9._\- ]+', '', custom_filename)
-            base = base.rsplit('.', 1)[0] if '.' in base else base
-            filename = base or (original_name + ("_report" if document_type != 'breakdown' else "_breakdown"))
+
+            base = _re.sub(r"[^A-Za-z0-9._\- ]+", "", custom_filename)
+            base = base.rsplit(".", 1)[0] if "." in base else base
+            filename = base or (
+                original_name
+                + ("_report" if document_type != "breakdown" else "_breakdown")
+            )
         else:
-            if document_type == 'breakdown':
+            if document_type == "breakdown":
                 filename = f"{original_name}_breakdown"
             else:  # report
                 filename = f"{original_name}_report"
-        
+
         # Add file extension
-        if file_format == 'pdf':
-            filename += '.pdf'
+        if file_format == "pdf":
+            filename += ".pdf"
         else:  # docx
-            filename += '.docx'
-        
+            filename += ".docx"
+
         # Prepare content for the document
-        if document_type == 'breakdown':
+        if document_type == "breakdown":
             # Get breakdown content
-            content = breakdown.content.get('sections', [])
+            content = breakdown.content.get("sections", [])
             if not content:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No breakdown content available to save'
-                })
-            
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "No breakdown content available to save",
+                    }
+                )
+
             # Format breakdown content
             document_content = f"BREAKDOWN REPORT: {breakdown.document.title}\n\n"
             for i, section in enumerate(content, 1):
                 document_content += f"{i}. {section.get('title', f'Section {i}')}\n"
                 document_content += f"{section.get('content', '')}\n\n"
-                
+
         else:  # report
             # Get report content or generate it if not available
-            if hasattr(breakdown, 'report_content') and breakdown.report_content:
-                content = breakdown.report_content.get('sections', [])
+            if hasattr(breakdown, "report_content") and breakdown.report_content:
+                content = breakdown.report_content.get("sections", [])
             else:
                 # Generate report content using AI
                 from .ai_breakdown import AIBreakdownService
+
                 ai_service = AIBreakdownService()
                 report_result = ai_service.create_detailed_report(
-                    breakdown.document.extracted_text,
-                    str(breakdown.content)
+                    breakdown.document.extracted_text, str(breakdown.content)
                 )
-                content = report_result.get('sections', [])
-            
+                content = report_result.get("sections", [])
+
             if not content:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No report content available to save'
-                })
-            
+                return JsonResponse(
+                    {"success": False, "error": "No report content available to save"}
+                )
+
             # Format report content
             document_content = f"COMPREHENSIVE REPORT: {breakdown.document.title}\n\n"
             for i, section in enumerate(content, 1):
                 document_content += f"{i}. {section.get('title', f'Section {i}')}\n"
                 document_content += f"{section.get('content', '')}\n\n"
-        
+
         # Create output directory if it doesn't exist
-        output_dir = os.path.join(settings.MEDIA_ROOT, 'generated_documents')
+        output_dir = os.path.join(settings.MEDIA_ROOT, "generated_documents")
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Full output path
         output_path = os.path.join(output_dir, filename)
-        
+
         # Call Java to generate the document
         try:
             java_result = call_java_document_generator(
                 document_type, file_format, document_content, output_path
             )
-            
-            if java_result['success']:
+
+            if java_result["success"]:
                 # Create a new Document record for the generated file
                 generated_doc = Document.objects.create(
                     title=filename,
                     file_type=file_format.lower(),  # store lowercase to match choices
                     document_type=document_type,
-                    status='completed',
+                    status="completed",
                     uploaded_at=timezone.now(),
                     extracted_text=(
                         document_content[:1000] + "..."
@@ -1454,115 +1879,144 @@ def save_document(request, breakdown_id):
                         else document_content
                     ),
                 )
-                
+
                 # Copy the generated file to the document's file field
-                with open(output_path, 'rb') as f:
+                with open(output_path, "rb") as f:
                     generated_doc.file.save(filename, File(f), save=True)
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'{document_type.title()} saved successfully as {filename}',
-                    'filename': filename,
-                    'file_format': file_format,
-                    'document_type': document_type,
-                    'download_url': generated_doc.file.url
-                })
+
+                return JsonResponse(
+                    {
+                        "success": True,
+                        "message": f"{document_type.title()} saved successfully as {filename}",
+                        "filename": filename,
+                        "file_format": file_format,
+                        "document_type": document_type,
+                        "download_url": generated_doc.file.url,
+                    }
+                )
             else:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Java document generation failed: {java_result["error"]}'
-                })
-                
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": f'Java document generation failed: {java_result["error"]}',
+                    }
+                )
+
         except Exception as java_error:
-            return JsonResponse({
-                'success': False,
-                'error': f'Error calling Java document generator: {str(java_error)}'
-            })
-        
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": f"Error calling Java document generator: {str(java_error)}",
+                }
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Error saving document: {str(e)}'
-        })
+        return JsonResponse(
+            {"success": False, "error": f"Error saving document: {str(e)}"}
+        )
 
 
 def call_java_document_generator(document_type, file_format, content, output_path):
     """
     Call the Java DocumentGenerator to create PDF or Word documents.
-    
+
     Args:
         document_type: Type of document ('breakdown' or 'report')
         file_format: File format ('pdf' or 'docx')
         content: Document content to include
         output_path: Where to save the generated file
-        
+
     Returns:
         Dict with success status and error message if any
     """
     try:
         import subprocess
         import tempfile
-        
+
         # Create a temporary file with the content
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as temp_file:
             temp_file.write(content)
             temp_content_path = temp_file.name
-        
+
         # Path to the Java JAR file
-        java_jar_path = os.path.join(settings.BASE_DIR, 'java_assets', 'DocumentGenerator.jar')
-        
+        java_jar_path = os.path.join(
+            settings.BASE_DIR, "java_assets", "DocumentGenerator.jar"
+        )
+
         # Check if JAR exists, if not, try to compile the Java file
         if not os.path.exists(java_jar_path):
-            java_source_path = os.path.join(settings.BASE_DIR, 'java_assets', 'DocumentGenerator.java')
+            java_source_path = os.path.join(
+                settings.BASE_DIR, "java_assets", "DocumentGenerator.java"
+            )
             if os.path.exists(java_source_path):
                 # Try to compile the Java file
-                compile_result = subprocess.run([
-                    'javac', '-cp', 'java_assets/*', java_source_path
-                ], capture_output=True, text=True, cwd=settings.BASE_DIR)
-                
+                compile_result = subprocess.run(
+                    ["javac", "-cp", "java_assets/*", java_source_path],
+                    capture_output=True,
+                    text=True,
+                    cwd=settings.BASE_DIR,
+                )
+
                 if compile_result.returncode != 0:
                     return {
-                        'success': False,
-                        'error': f'Failed to compile Java source: {compile_result.stderr}'
+                        "success": False,
+                        "error": f"Failed to compile Java source: {compile_result.stderr}",
                     }
-                
+
                 # Try to run the compiled class
-                java_class_path = os.path.join(settings.BASE_DIR, 'java_assets')
-                result = subprocess.run([
-                    'java', '-cp', java_class_path, 'DocumentGenerator',
-                    document_type, file_format, temp_content_path, output_path
-                ], capture_output=True, text=True, cwd=settings.BASE_DIR)
+                java_class_path = os.path.join(settings.BASE_DIR, "java_assets")
+                result = subprocess.run(
+                    [
+                        "java",
+                        "-cp",
+                        java_class_path,
+                        "DocumentGenerator",
+                        document_type,
+                        file_format,
+                        temp_content_path,
+                        output_path,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd=settings.BASE_DIR,
+                )
             else:
-                return {
-                    'success': False,
-                    'error': 'Java source file not found'
-                }
+                return {"success": False, "error": "Java source file not found"}
         else:
             # Run the JAR file
-            result = subprocess.run([
-                'java', '-jar', java_jar_path,
-                document_type, file_format, temp_content_path, output_path
-            ], capture_output=True, text=True, cwd=settings.BASE_DIR)
-        
+            result = subprocess.run(
+                [
+                    "java",
+                    "-jar",
+                    java_jar_path,
+                    document_type,
+                    file_format,
+                    temp_content_path,
+                    output_path,
+                ],
+                capture_output=True,
+                text=True,
+                cwd=settings.BASE_DIR,
+            )
+
         # Clean up temporary file
         try:
             os.unlink(temp_content_path)
         except:
             pass
-        
+
         if result.returncode == 0:
-            return {'success': True}
+            return {"success": True}
         else:
             return {
-                'success': False,
-                'error': f'Java execution failed: {result.stderr}'
+                "success": False,
+                "error": f"Java execution failed: {result.stderr}",
             }
-            
+
     except Exception as e:
-        return {
-            'success': False,
-            'error': f'Error calling Java: {str(e)}'
-        }
+        return {"success": False, "error": f"Error calling Java: {str(e)}"}
 
 
 @csrf_exempt
@@ -1574,31 +2028,27 @@ def generate_report(request, breakdown_id):
     try:
         breakdown = get_object_or_404(Breakdown, id=breakdown_id)
         data = json.loads(request.body)
-        
-        extracted_text = data.get('extracted_text', '')
-        breakdown_content = data.get('breakdown_content', '')
-        
+
+        extracted_text = data.get("extracted_text", "")
+        breakdown_content = data.get("breakdown_content", "")
+
         # Use AI service to generate detailed report
         from .ai_breakdown import AIBreakdownService
+
         ai_service = AIBreakdownService()
-        
+
         report_result = ai_service.create_detailed_report(
             extracted_text, breakdown_content
         )
-        
-        if report_result and report_result.get('sections'):
-            return JsonResponse({
-                'success': True,
-                'report': report_result
-            })
+
+        if report_result and report_result.get("sections"):
+            return JsonResponse({"success": True, "report": report_result})
         else:
-            return JsonResponse({
-                'success': False,
-                'error': 'Failed to generate report content'
-            })
-            
+            return JsonResponse(
+                {"success": False, "error": "Failed to generate report content"}
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Error generating report: {str(e)}'
-        })
+        return JsonResponse(
+            {"success": False, "error": f"Error generating report: {str(e)}"}
+        )

@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class BreakdownConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'breakdown'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "breakdown"

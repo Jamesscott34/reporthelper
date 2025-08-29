@@ -16,7 +16,7 @@
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="document" class="form-label">Select Document</label>
-                        <input type="file" class="form-control" id="document" name="document" 
+                        <input type="file" class="form-control" id="document" name="document"
                                accept=".pdf,.docx,.doc,.txt" required>
                         <div class="form-text">
                             Supported formats: PDF, DOCX, DOC, TXT (Max 50MB)
@@ -47,16 +47,16 @@ $(document).ready(function() {
             $(this).next('.form-text').html('Selected file: ' + fileName);
         }
     });
-    
+
     // Handle form submission
     $('#uploadForm').on('submit', function(e) {
         e.preventDefault();
-        
+
         // Submit form via AJAX
         var formData = new FormData(this);
-        
+
         $.ajax({
-            url: '{% url "breakdown:upload_document" %}',
+            url: '{% url "breakdown:upload" %}',
             type: 'POST',
             data: formData,
             processData: false,
@@ -76,4 +76,4 @@ $(document).ready(function() {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}

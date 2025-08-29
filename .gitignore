@@ -61,6 +61,44 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Test results
+test_results/
+
+# Code quality and development tools
+.flake8-cache/
+.bandit
+.bandit.json
+security_report.json
+.pre-commit-config.yaml.backup
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+.tox/
+
+# Pre-commit hooks
+.pre-commit-config.yaml.backup
+
+# Development documentation and reports
+DEVELOPMENT_SETUP.md.backup
+SECURITY_AUDIT.md.backup
+SECURITY.md.backup
+
+# Code quality reports
+bandit-report.json
+bandit-report.txt
+flake8-report.txt
+mypy-report.txt
+safety-report.json
+
+# Development scripts backup
+scripts/*.backup
+scripts/.DS_Store
+
 # Flask stuff:
 instance/
 .webassets-cache
@@ -84,12 +122,7 @@ ipython_config.py
 # pyenv
 .python-version
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
@@ -144,15 +177,34 @@ superuser_created
 *.pdf
 documents/
 uploads/
+media/documents/
+models.txt
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Development files that may be generated
+start_simple.ps1.backup
+start.bat.backup
 
-# OS
+# Documentation (if generated)
+docs/_build/
+docs/.doctrees/
+site/
+
+# Configuration files that may contain sensitive data
+.secrets.baseline.backup
+.env.local
+.env.production
+.env.staging
+
+# Generated configuration backups
+pyproject.toml.backup
+.flake8.backup
+.pre-commit-config.yaml.backup
+Makefile.backup
+
+# Makefile outputs
+.make.log
+
+# OS and Editor files
 .DS_Store
 .DS_Store?
 ._*
@@ -160,6 +212,11 @@ uploads/
 .Trashes
 ehthumbs.db
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Temporary files
 *.tmp
@@ -176,4 +233,4 @@ target/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log* 
+yarn-error.log*

@@ -1,0 +1,80 @@
+# Pre-commit hooks configuration for AI Report Writer
+# Install with: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=88]
+
+  # Python import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=88]
+
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-django
+          - flake8-docstrings
+
+  # Security linting
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: debug-statements
+      - id: check-docstring-first
+
+  # Django specific checks
+  - repo: https://github.com/adamchainz/django-upgrade
+    rev: 1.15.0
+    hooks:
+      - id: django-upgrade
+        args: [--target-version, "4.2"]
+
+  # Security and secrets scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: \.lock$|package-lock\.json$
+
+# Global exclusions
+exclude: |
+  (?x)^(
+      .*migrations/.*\.py|
+      .*\.min\.(js|css)|
+      .*node_modules/.*|
+      .*\.git/.*|
+      .*venv/.*|
+      .*\.venv/.*|
+      .*env/.*|
+      .*__pycache__/.*
+  )$

@@ -6,7 +6,9 @@ Run this script to generate a new secret key for production use.
 
 import os
 import sys
+
 from django.core.management.utils import get_random_secret_key
+
 
 def generate_secret_key():
     """Generate a secure Django secret key."""
@@ -20,10 +22,11 @@ def generate_secret_key():
     print(f"   export SECRET_KEY='{secret_key}'")
     return secret_key
 
+
 if __name__ == "__main__":
     try:
         generate_secret_key()
     except ImportError:
         print("Django not found. Please install Django first:")
         print("pip install django")
-        sys.exit(1) 
+        sys.exit(1)
