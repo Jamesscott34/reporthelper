@@ -40,13 +40,12 @@ ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 
 # AI Configuration (OpenRoute AI)
 OPENROUTE_HOST=https://openrouter.ai/api/v1
-OPENROUTE_API_KEY_DEEPSEEK=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
-OPENROUTE_API_KEY_TNGTECH=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
-OPENROUTE_API_KEY_OPENROUTER=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
-BREAKDOWN_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
-REVIEWER_MODEL=tngtech/deepseek-r1t2-chimera:free
-FINALIZER_MODEL=deepseek/deepseek-r1-0528-qwen3-8b:free
-REANALYZER_MODEL=openrouter/horizon-beta
+
+OPENROUTE_API_KEY_OPENROUTER=sk-or-v1-apikeyfa
+BREAKDOWN_MODEL=deepseek/model
+REVIEWER_MODEL=tngtech/model
+FINALIZER_MODEL=deepseek/model
+REANALYZER_MODEL=openrouter/model
 
 # Database Configuration
 DATABASE_URL=sqlite:///db.sqlite3
