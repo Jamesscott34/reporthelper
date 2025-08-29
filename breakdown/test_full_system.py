@@ -44,7 +44,9 @@ class BaseTestCase(TestCase):
         """Set up test data used by multiple test methods."""
         # Create test users
         self.user1 = User.objects.create_user(
-            username="testuser1", email="test1@example.com", password="testpass123"  # pragma: allowlist secret
+            username="testuser1",
+            email="test1@example.com",
+            password="testpass123",  # pragma: allowlist secret
         )
         self.user2 = User.objects.create_user(
             username="testuser2", email="test2@example.com", password="testpass123"
